@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Screenshots (usually too large and change frequently)
+screenshots/
+*.png
+*.jpg
+*.jpeg
+
+# Session files
+session_info.json
+sessions/
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+
+# Credentials (if any)
+.env
+credentials.json
+secrets.json
+
+# Node modules (if any)
+node_modules/
+
+# Deprecated/experimental (we're keeping these but marking them)
+# deprecated/
+
+# Server state
+server_state/
+browser_contexts/
