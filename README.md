@@ -1,4 +1,15 @@
-# Browser Automation Project
+# Browser Automation Framework
+
+A modular, visual-first browser automation framework built on Playwright with AI-powered element detection.
+
+## ✨ Key Features
+
+- **🎯 Crosshair Click Visualization** - See exactly where every click happens
+- **👁️ Visual Verification First** - Screenshots are the source of truth, not DOM checks
+- **🤖 AI-Powered Element Detection** - Gemini Vision API integration for hard-to-find elements
+- **📦 Modular Step-by-Step Pattern** - Each action in its own reusable script
+- **🔄 Session Persistence** - Maintain browser state across script executions
+- **🐛 Advanced Debugging** - Console logs, network monitoring, detailed screenshots
 
 ## 🚨 IMPORTANT: Use Step-by-Step Scripts
 
