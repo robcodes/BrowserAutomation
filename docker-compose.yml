@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - browser_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  browser-server:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - BROWSER_SERVER_API_KEY=${BROWSER_SERVER_API_KEY:-development-key}
+      - REDIS_URL=redis://redis:6379
+      - MAX_SESSIONS=${MAX_SESSIONS:-10}
+      - MAX_PAGES_PER_SESSION=${MAX_PAGES_PER_SESSION:-20}
+      - SESSION_TIMEOUT=${SESSION_TIMEOUT:-3600}
+      - SCREENSHOT_DIR=/tmp/screenshots
+    volumes:
+      - screenshots:/tmp/screenshots
+    networks:
+      - browser_network
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    # Increase shared memory size for Chrome
+    shm_size: 2gb
+    # Security options for Chrome
+    security_opt:
+      - seccomp:unconfined
+
+volumes:
+  redis_data:
+  screenshots:
+
+networks:
+  browser_network:
+    driver: bridge
