@@ -508,3 +508,61 @@ def visualize_bboxes(screenshot_path, json_data=None, json_path=None, output_pat
 def visualize_crosshairs(screenshot_path, json_data=None, json_path=None, output_path=None):
     """Create a crosshair visualization"""
     return visualize(screenshot_path, json_data, json_path, mode='crosshair', output_path=output_path)
+
+
+if __name__ == "__main__":
+    import argparse
+    import sys
+    
+    parser = argparse.ArgumentParser(
+        description='Visualize bounding boxes or crosshairs on screenshots',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+Examples:
+  # Visualize bounding boxes
+  %(prog)s screenshot.png boxes.json
+  
+  # Visualize crosshairs
+  %(prog)s screenshot.png boxes.json --mode crosshair
+  
+  # Specify output path
+  %(prog)s screenshot.png boxes.json --output annotated.png
+  
+  # Read JSON from stdin
+  cat boxes.json | %(prog)s screenshot.png -
+        '''
+    )
+    
+    parser.add_argument('screenshot', help='Path to screenshot image')
+    parser.add_argument('json_file', help='Path to JSON file with coordinates (use "-" for stdin)')
+    parser.add_argument('--mode', choices=['bbox', 'crosshair'], default='bbox',
+                       help='Visualization mode (default: bbox)')
+    parser.add_argument('--output', '-o', help='Output path (auto-generated if not specified)')
+    
+    args = parser.parse_args()
+    
+    try:
+        # Read JSON data
+        if args.json_file == '-':
+            # Read from stdin
+            json_data = json.load(sys.stdin)
+            json_path = None
+        else:
+            # Read from file
+            json_data = None
+            json_path = args.json_file
+        
+        # Create visualization
+        output_path = visualize(
+            screenshot_path=args.screenshot,
+            json_data=json_data,
+            json_path=json_path,
+            mode=args.mode,
+            output_path=args.output
+        )
+        
+        print(f"Created visualization: {output_path}")
+        
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
