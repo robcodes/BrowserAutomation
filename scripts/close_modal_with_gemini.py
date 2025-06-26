@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from scripts.fuzzycode_steps.common import *
+from fuzzycode_steps.common import *
 from clients.gemini_detector import GeminiDetector
 
 GEMINI_API_KEY = "AIzaSyDltBed5hYSZMfL2fsRcD2mXrwsiPaU7oA"
