@@ -4,7 +4,9 @@ Enhanced Persistent Browser Server with Console Log Capture
 Maintains browser sessions across requests and captures console logs
 """
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, List, Optional, Any, Literal
 from datetime import datetime
@@ -15,8 +17,23 @@ from pathlib import Path
 from playwright.async_api import async_playwright, Browser, Page, BrowserContext
 import json
 from collections import defaultdict, deque
+import io
+from PIL import Image
+
+# Import the modular tools
+from screenshot_to_gemini_bb_json import detect_bounding_boxes
+from bbox_visualizer import visualize
 
 app = FastAPI(title="Enhanced Browser Server", version="2.0")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Global storage
 browsers: Dict[str, Browser] = {}
@@ -52,6 +69,21 @@ class LogQueryRequest(BaseModel):
     until: Optional[datetime] = None   # Logs until this time
     limit: Optional[int] = 100         # Max number of logs to return
     text_contains: Optional[str] = None # Filter logs containing this text
+
+class NavigateRequest(BaseModel):
+    session_id: str
+    page_id: str
+    url: str
+
+class BoundingBoxRequest(BaseModel):
+    screenshot: str  # Base64 encoded image or file path
+    api_key: str
+    prompt: Optional[str] = None
+
+class VisualizeRequest(BaseModel):
+    screenshot: str  # Base64 encoded image
+    bounding_boxes: List[List[int]]  # Array of [ymin, xmin, ymax, xmax]
+    mode: Literal['bbox', 'crosshair'] = 'bbox'
 
 @app.on_event("startup")
 async def startup():
@@ -412,9 +444,159 @@ async def root():
         "version": "2.0"
     }
 
+@app.get("/get_screenshot/{session_id}/{page_id}")
+async def get_screenshot(session_id: str, page_id: str):
+    """Get screenshot for a session/page"""
+    if session_id not in sessions:
+        raise HTTPException(404, f"Session not found: {session_id}")
+    if page_id not in pages:
+        raise HTTPException(404, f"Page not found: {page_id}")
+    
+    try:
+        page = pages[page_id]
+        screenshot_data = await page.screenshot()
+        
+        # Return base64 encoded image
+        return {
+            "status": "success",
+            "screenshot": base64.b64encode(screenshot_data).decode(),
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Failed to take screenshot: {str(e)}")
+
+@app.post("/navigate_to")
+async def navigate_to(request: NavigateRequest):
+    """Navigate to a URL"""
+    if request.session_id not in sessions:
+        raise HTTPException(404, f"Session not found: {request.session_id}")
+    if request.page_id not in pages:
+        raise HTTPException(404, f"Page not found: {request.page_id}")
+    
+    try:
+        page = pages[request.page_id]
+        await page.goto(request.url)
+        
+        return {
+            "status": "success",
+            "url": page.url,
+            "title": await page.title()
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Failed to navigate: {str(e)}")
+
+@app.post("/screenshot_to_bounding_boxes")
+async def screenshot_to_bounding_boxes(request: BoundingBoxRequest):
+    """Send screenshot to Gemini Vision API and extract bounding boxes"""
+    try:
+        # Handle base64 encoded screenshot
+        if request.screenshot.startswith('data:image'):
+            # Extract base64 data from data URL
+            base64_data = request.screenshot.split(',')[1]
+        else:
+            base64_data = request.screenshot
+        
+        # Decode and save temporarily
+        screenshot_data = base64.b64decode(base64_data)
+        temp_path = Path("/tmp") / f"temp_screenshot_{uuid.uuid4().hex}.png"
+        
+        with open(temp_path, 'wb') as f:
+            f.write(screenshot_data)
+        
+        try:
+            # Use the imported function
+            result = await detect_bounding_boxes(
+                str(temp_path),
+                request.api_key,
+                save_json=False,
+                prompt=request.prompt
+            )
+            
+            return {
+                "status": "success",
+                "raw_response": result['raw_response'],
+                "coordinates": result['coordinates'],
+                "count": len(result['coordinates'])
+            }
+        finally:
+            # Clean up temp file
+            if temp_path.exists():
+                temp_path.unlink()
+                
+    except Exception as e:
+        raise HTTPException(500, f"Failed to detect bounding boxes: {str(e)}")
+
+@app.post("/visualize_bounding_boxes")
+async def visualize_bounding_boxes(request: VisualizeRequest):
+    """Visualize bounding boxes on a screenshot"""
+    try:
+        # Decode base64 screenshot
+        if request.screenshot.startswith('data:image'):
+            base64_data = request.screenshot.split(',')[1]
+        else:
+            base64_data = request.screenshot
+            
+        screenshot_data = base64.b64decode(base64_data)
+        temp_screenshot = Path("/tmp") / f"temp_screenshot_{uuid.uuid4().hex}.png"
+        
+        with open(temp_screenshot, 'wb') as f:
+            f.write(screenshot_data)
+        
+        try:
+            # Prepare JSON data for visualization
+            json_data = {
+                "coordinates": request.bounding_boxes
+            }
+            
+            # Create visualization
+            output_path = visualize(
+                str(temp_screenshot),
+                json_data=json_data,
+                mode=request.mode,
+                output_path=None
+            )
+            
+            # Read the result and encode as base64
+            with open(output_path, 'rb') as f:
+                result_data = f.read()
+            
+            result_base64 = base64.b64encode(result_data).decode()
+            
+            # Clean up output file
+            Path(output_path).unlink()
+            
+            return {
+                "status": "success",
+                "visualized_image": f"data:image/png;base64,{result_base64}",
+                "mode": request.mode
+            }
+            
+        finally:
+            # Clean up temp file
+            if temp_screenshot.exists():
+                temp_screenshot.unlink()
+                
+    except Exception as e:
+        raise HTTPException(500, f"Failed to visualize: {str(e)}")
+
+# Mount static files
+static_dir = Path(__file__).parent / "static"
+static_dir.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+# Add route for the UI
+@app.get("/ui")
+async def ui():
+    """Serve the UI"""
+    ui_file = static_dir / "index.html"
+    if not ui_file.exists():
+        raise HTTPException(404, "UI not found. Please create /static/index.html")
+    return FileResponse(str(ui_file))
+
 if __name__ == "__main__":
     import uvicorn
     print("Starting Enhanced Browser Server with Console Capture...")
     print("Server will run at: http://localhost:8000")
     print("API docs at: http://localhost:8000/docs")
+    print("Browser UI at: http://localhost:8000/ui")
     uvicorn.run(app, host="0.0.0.0", port=8000)

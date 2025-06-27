@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browser Automation UI</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f7;
+            color: #1d1d1f;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            color: #1d1d1f;
+            text-align: center;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #1d1d1f;
+        }
+        
+        .input-group {
+            margin-bottom: 1rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #6e6e73;
+        }
+        
+        input[type="text"], input[type="url"], textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+        
+        input[type="text"]:focus, input[type="url"]:focus, textarea:focus {
+            outline: none;
+            border-color: #0071e3;
+        }
+        
+        button {
+            background-color: #0071e3;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        button:hover {
+            background-color: #0051d5;
+        }
+        
+        button:disabled {
+            background-color: #d2d2d7;
+            cursor: not-allowed;
+        }
+        
+        button.secondary {
+            background-color: #6e6e73;
+        }
+        
+        button.secondary:hover {
+            background-color: #515154;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .status {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+        
+        .status.success {
+            background-color: #d1f4d1;
+            color: #1a7c1a;
+        }
+        
+        .status.error {
+            background-color: #ffd1d1;
+            color: #d70015;
+        }
+        
+        .status.info {
+            background-color: #d1e7ff;
+            color: #0051d5;
+        }
+        
+        .image-container {
+            margin-top: 1rem;
+            text-align: center;
+            background-color: #f5f5f7;
+            border-radius: 8px;
+            padding: 1rem;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .image-container img {
+            max-width: 100%;
+            max-height: 600px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .json-container {
+            background-color: #f5f5f7;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            overflow-x: auto;
+        }
+        
+        .json-container pre {
+            font-family: 'SF Mono', Monaco, 'Cascadia Mono', monospace;
+            font-size: 0.875rem;
+            color: #1d1d1f;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .collapsible {
+            cursor: pointer;
+            padding: 0.5rem;
+            background-color: #f5f5f7;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .collapsible:hover {
+            background-color: #e8e8ed;
+        }
+        
+        .collapsible::after {
+            content: '▼';
+            font-size: 0.75rem;
+            transition: transform 0.2s;
+        }
+        
+        .collapsible.active::after {
+            transform: rotate(180deg);
+        }
+        
+        .collapsible-content {
+            display: none;
+            overflow: hidden;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,.1);
+            border-radius: 50%;
+            border-top-color: #0071e3;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .file-upload {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        
+        .file-upload input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        
+        .workflow-progress {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .workflow-step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+        }
+        
+        .workflow-step::after {
+            content: '→';
+            position: absolute;
+            right: -20px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.5rem;
+            color: #d2d2d7;
+        }
+        
+        .workflow-step:last-child::after {
+            display: none;
+        }
+        
+        .workflow-step.active {
+            color: #0071e3;
+            font-weight: 600;
+        }
+        
+        .workflow-step.completed {
+            color: #1a7c1a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Browser Automation Control Panel</h1>
+        
+        <div class="workflow-progress">
+            <div class="workflow-step" id="step-session">1. Start Session</div>
+            <div class="workflow-step" id="step-navigate">2. Navigate</div>
+            <div class="workflow-step" id="step-screenshot">3. Screenshot</div>
+            <div class="workflow-step" id="step-detect">4. Detect Elements</div>
+            <div class="workflow-step" id="step-visualize">5. Visualize</div>
+        </div>
+        
+        <!-- Session Management -->
+        <div class="card">
+            <h2>Session Management</h2>
+            <div id="session-status" class="status info" style="display: none;"></div>
+            
+            <div class="button-group">
+                <button id="start-session" onclick="startSession()">Start New Browser Session</button>
+                <button id="list-sessions" onclick="listSessions()" class="secondary">List Active Sessions</button>
+            </div>
+            
+            <div class="input-group" style="margin-top: 1rem; display: none;" id="session-info">
+                <label>Current Session ID:</label>
+                <input type="text" id="session-id" readonly>
+                <label style="margin-top: 0.5rem;">Current Page ID:</label>
+                <input type="text" id="page-id" readonly>
+            </div>
+        </div>
+        
+        <!-- Navigation -->
+        <div class="card" id="navigation-card" style="display: none;">
+            <h2>Navigation</h2>
+            <div class="input-group">
+                <label for="url">URL to Navigate:</label>
+                <input type="url" id="url" placeholder="https://example.com" value="https://fuzzycode.dev">
+            </div>
+            <button onclick="navigateToUrl()">Navigate to URL</button>
+        </div>
+        
+        <!-- Screenshot -->
+        <div class="card" id="screenshot-card" style="display: none;">
+            <h2>Screenshot Capture</h2>
+            <button onclick="takeScreenshot()">Take Screenshot</button>
+            
+            <div class="file-upload">
+                <button class="secondary">Or Upload Screenshot</button>
+                <input type="file" accept="image/*" onchange="handleFileUpload(event)">
+            </div>
+            
+            <div class="image-container" id="screenshot-container">
+                <span style="color: #6e6e73;">No screenshot captured yet</span>
+            </div>
+        </div>
+        
+        <!-- Bounding Box Detection -->
+        <div class="card" id="detection-card" style="display: none;">
+            <h2>Element Detection with Gemini Vision</h2>
+            
+            <div class="input-group">
+                <label for="api-key">Gemini API Key:</label>
+                <input type="text" id="api-key" placeholder="AIzaSy..." value="AIzaSyDltBed5hYSZMfL2fsRcD2mXrwsiPaU7oA">
+            </div>
+            
+            <div class="input-group">
+                <label for="prompt">Detection Prompt (optional):</label>
+                <textarea id="prompt" rows="3" placeholder="Leave empty for default prompt">Return bounding boxes as JSON arrays [ymin, xmin, ymax, xmax] for all icons, svgs, clickable elements, buttons, etc</textarea>
+            </div>
+            
+            <button onclick="detectBoundingBoxes()">Detect Elements</button>
+            
+            <div class="collapsible" onclick="toggleCollapsible(this)" style="display: none;" id="json-collapsible">
+                <span>Detected Bounding Boxes JSON</span>
+            </div>
+            <div class="collapsible-content">
+                <div class="json-container">
+                    <pre id="json-output"></pre>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Visualization -->
+        <div class="card" id="visualization-card" style="display: none;">
+            <h2>Visualization</h2>
+            
+            <div class="button-group">
+                <button onclick="visualize('bbox')">Visualize as Bounding Boxes</button>
+                <button onclick="visualize('crosshair')">Visualize as Crosshairs</button>
+                <button onclick="resetWorkflow()" class="secondary">Start Over</button>
+            </div>
+            
+            <div class="image-container" id="visualization-container">
+                <span style="color: #6e6e73;">No visualization created yet</span>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Global state
+        let currentSession = null;
+        let currentPage = null;
+        let currentScreenshot = null;
+        let detectedBoundingBoxes = null;
+        
+        // Update workflow progress
+        function updateWorkflowStep(step) {
+            const steps = ['session', 'navigate', 'screenshot', 'detect', 'visualize'];
+            const currentIndex = steps.indexOf(step);
+            
+            steps.forEach((s, index) => {
+                const element = document.getElementById(`step-${s}`);
+                if (index < currentIndex) {
+                    element.classList.add('completed');
+                    element.classList.remove('active');
+                } else if (index === currentIndex) {
+                    element.classList.add('active');
+                    element.classList.remove('completed');
+                } else {
+                    element.classList.remove('active', 'completed');
+                }
+            });
+        }
+        
+        // Show status message
+        function showStatus(message, type = 'info') {
+            const statusElements = document.querySelectorAll('.status');
+            statusElements.forEach(el => el.style.display = 'none');
+            
+            const status = document.getElementById('session-status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            
+            if (type !== 'error') {
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        // Start a new browser session
+        async function startSession() {
+            const button = document.getElementById('start-session');
+            button.disabled = true;
+            button.innerHTML = '<span class="loading"></span> Starting...';
+            
+            try {
+                const response = await fetch('/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ browser_type: 'chromium', headless: false })
+                });
+                
+                if (!response.ok) throw new Error('Failed to create session');
+                
+                const data = await response.json();
+                currentSession = data.session_id;
+                
+                // Create a page in the session
+                const pageResponse = await fetch(`/sessions/${currentSession}/pages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!pageResponse.ok) throw new Error('Failed to create page');
+                
+                const pageData = await pageResponse.json();
+                currentPage = pageData.page_id;
+                
+                // Update UI
+                document.getElementById('session-id').value = currentSession;
+                document.getElementById('page-id').value = currentPage;
+                document.getElementById('session-info').style.display = 'block';
+                document.getElementById('navigation-card').style.display = 'block';
+                
+                showStatus('Browser session started successfully!', 'success');
+                updateWorkflowStep('navigate');
+                
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = 'Start New Browser Session';
+            }
+        }
+        
+        // List active sessions
+        async function listSessions() {
+            try {
+                const response = await fetch('/sessions');
+                const data = await response.json();
+                
+                if (data.count === 0) {
+                    showStatus('No active sessions', 'info');
+                } else {
+                    showStatus(`Active sessions: ${data.sessions.join(', ')}`, 'info');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Navigate to URL
+        async function navigateToUrl() {
+            if (!currentSession || !currentPage) {
+                showStatus('Please start a session first', 'error');
+                return;
+            }
+            
+            const url = document.getElementById('url').value;
+            if (!url) {
+                showStatus('Please enter a URL', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/navigate_to', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: currentSession,
+                        page_id: currentPage,
+                        url: url
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Failed to navigate');
+                
+                const data = await response.json();
+                showStatus(`Navigated to: ${data.title}`, 'success');
+                
+                document.getElementById('screenshot-card').style.display = 'block';
+                updateWorkflowStep('screenshot');
+                
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Take screenshot
+        async function takeScreenshot() {
+            if (!currentSession || !currentPage) {
+                showStatus('Please start a session first', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/get_screenshot/${currentSession}/${currentPage}`);
+                if (!response.ok) throw new Error('Failed to take screenshot');
+                
+                const data = await response.json();
+                currentScreenshot = `data:image/png;base64,${data.screenshot}`;
+                
+                // Display screenshot
+                const container = document.getElementById('screenshot-container');
+                container.innerHTML = `<img src="${currentScreenshot}" alt="Screenshot">`;
+                
+                showStatus('Screenshot captured successfully!', 'success');
+                document.getElementById('detection-card').style.display = 'block';
+                updateWorkflowStep('detect');
+                
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Handle file upload
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentScreenshot = e.target.result;
+                
+                // Display screenshot
+                const container = document.getElementById('screenshot-container');
+                container.innerHTML = `<img src="${currentScreenshot}" alt="Screenshot">`;
+                
+                showStatus('Screenshot uploaded successfully!', 'success');
+                document.getElementById('detection-card').style.display = 'block';
+                updateWorkflowStep('detect');
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Detect bounding boxes
+        async function detectBoundingBoxes() {
+            if (!currentScreenshot) {
+                showStatus('Please capture or upload a screenshot first', 'error');
+                return;
+            }
+            
+            const apiKey = document.getElementById('api-key').value;
+            if (!apiKey) {
+                showStatus('Please enter your Gemini API key', 'error');
+                return;
+            }
+            
+            const prompt = document.getElementById('prompt').value || undefined;
+            
+            try {
+                showStatus('Detecting elements with Gemini Vision...', 'info');
+                
+                const response = await fetch('/screenshot_to_bounding_boxes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        screenshot: currentScreenshot,
+                        api_key: apiKey,
+                        prompt: prompt
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(error);
+                }
+                
+                const data = await response.json();
+                detectedBoundingBoxes = data.coordinates;
+                
+                // Show JSON output
+                document.getElementById('json-output').textContent = JSON.stringify(data.coordinates, null, 2);
+                document.getElementById('json-collapsible').style.display = 'block';
+                
+                showStatus(`Detected ${data.count} elements!`, 'success');
+                document.getElementById('visualization-card').style.display = 'block';
+                updateWorkflowStep('visualize');
+                
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Visualize bounding boxes
+        async function visualize(mode) {
+            if (!currentScreenshot || !detectedBoundingBoxes) {
+                showStatus('Please detect bounding boxes first', 'error');
+                return;
+            }
+            
+            try {
+                showStatus(`Creating ${mode} visualization...`, 'info');
+                
+                const response = await fetch('/visualize_bounding_boxes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        screenshot: currentScreenshot,
+                        bounding_boxes: detectedBoundingBoxes,
+                        mode: mode
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Failed to create visualization');
+                
+                const data = await response.json();
+                
+                // Display visualization
+                const container = document.getElementById('visualization-container');
+                container.innerHTML = `<img src="${data.visualized_image}" alt="Visualization">`;
+                
+                showStatus('Visualization created successfully!', 'success');
+                
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Toggle collapsible content
+        function toggleCollapsible(element) {
+            element.classList.toggle('active');
+            const content = element.nextElementSibling;
+            if (content.style.display === 'block') {
+                content.style.display = 'none';
+            } else {
+                content.style.display = 'block';
+            }
+        }
+        
+        // Reset workflow
+        function resetWorkflow() {
+            // Clear screenshot
+            currentScreenshot = null;
+            detectedBoundingBoxes = null;
+            
+            document.getElementById('screenshot-container').innerHTML = '<span style="color: #6e6e73;">No screenshot captured yet</span>';
+            document.getElementById('visualization-container').innerHTML = '<span style="color: #6e6e73;">No visualization created yet</span>';
+            document.getElementById('json-collapsible').style.display = 'none';
+            document.getElementById('json-output').textContent = '';
+            
+            // Reset to screenshot step
+            updateWorkflowStep('screenshot');
+            showStatus('Ready to take a new screenshot', 'info');
+        }
+        
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateWorkflowStep('session');
+        });
+    </script>
+</body>
+</html>
