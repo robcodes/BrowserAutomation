@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(python test_playwright_browser.py)",
+      "Bash(pip install:*)",
+      "Bash(npx playwright install:*)",
+      "Bash(playwright install:*)",
+      "Bash(firefox:*)",
+      "Bash(python:*)",
+      "Bash(curl:*)",
+      "Bash(cat:*)"
+    ],
+    "deny": []
+  }
+}

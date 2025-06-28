@@ -1,0 +1,13 @@
+modules = ["bash", "nodejs-20", "python-3.12", "web"]
+run = "python server/browser_server_enhanced.py"
+
+[nix]
+channel = "stable-24_05"
+packages = ["gitFull", "playwright-driver"]
+
+[deployment]
+run = ["sh", "-c", "python server/browser_server_enhanced.py"]
+
+[[ports]]
+localPort = 8000
+externalPort = 80
