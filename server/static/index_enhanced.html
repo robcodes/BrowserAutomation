@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browser Automation UI - Enhanced</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f7;
+            color: #1d1d1f;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            color: #1d1d1f;
+            text-align: center;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #1d1d1f;
+        }
+        
+        .input-group {
+            margin-bottom: 1rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #6e6e73;
+        }
+        
+        input[type="text"], input[type="url"], textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+        
+        input[type="text"]:focus, input[type="url"]:focus, textarea:focus {
+            outline: none;
+            border-color: #0071e3;
+        }
+        
+        button {
+            background-color: #0071e3;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            position: relative;
+        }
+        
+        button:hover:not(:disabled) {
+            background-color: #0051d5;
+        }
+        
+        button:disabled {
+            background-color: #d2d2d7;
+            cursor: not-allowed;
+        }
+        
+        button.secondary {
+            background-color: #6e6e73;
+        }
+        
+        button.secondary:hover:not(:disabled) {
+            background-color: #515154;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        /* Loading spinner styles */
+        .loading-spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        button.loading .loading-spinner {
+            display: inline-block;
+        }
+        
+        button.loading {
+            padding-left: 2.5rem;
+        }
+        
+        @keyframes spin {
+            to { transform: translateY(-50%) rotate(360deg); }
+        }
+        
+        /* Loading overlay for cards */
+        .card.loading {
+            position: relative;
+            pointer-events: none;
+        }
+        
+        .card.loading::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.8);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .loading-message {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 10;
+            text-align: center;
+        }
+        
+        .card.loading .loading-message {
+            display: block;
+        }
+        
+        .loading-message .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(0,113,227,.3);
+            border-radius: 50%;
+            border-top-color: #0071e3;
+            animation: spin 1s ease-in-out infinite;
+            margin: 0 auto 0.5rem;
+        }
+        
+        .status {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+        
+        .status.success {
+            background-color: #d1f4d1;
+            color: #1a7c1a;
+        }
+        
+        .status.error {
+            background-color: #ffd1d1;
+            color: #d70015;
+        }
+        
+        .status.info {
+            background-color: #d1e7ff;
+            color: #0051d5;
+        }
+        
+        .image-container {
+            margin-top: 1rem;
+            text-align: center;
+            background-color: #f5f5f7;
+            border-radius: 8px;
+            padding: 1rem;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .image-container img {
+            max-width: 100%;
+            max-height: 600px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        /* Current URL display */
+        .current-url {
+            background-color: #f5f5f7;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            color: #6e6e73;
+        }
+        
+        .current-url strong {
+            color: #1d1d1f;
+        }
+        
+        /* Enhanced bounding box display */
+        .bbox-list {
+            margin-top: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .bbox-item {
+            background: #f5f5f7;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .bbox-coords {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.875rem;
+            color: #515154;
+        }
+        
+        .bbox-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .bbox-actions button {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+        
+        .bbox-actions input[type="text"] {
+            width: 150px;
+            padding: 0.5rem;
+            font-size: 0.875rem;
+        }
+        
+        /* Command execution area */
+        .command-area {
+            background: #2d2d30;
+            color: #cccccc;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .command-textarea {
+            width: 100%;
+            min-height: 150px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 1rem;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.875rem;
+            resize: vertical;
+        }
+        
+        .command-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+        }
+        
+        .command-result {
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.875rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .command-history {
+            margin-top: 1rem;
+        }
+        
+        .history-item {
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .history-item:hover {
+            background: #2d2d30;
+        }
+        
+        /* Code tooltip */
+        .code-tooltip {
+            position: fixed;
+            background: #2d2d30;
+            color: #d4d4d4;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 0.5rem;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.75rem;
+            z-index: 1000;
+            max-width: 400px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            display: none;
+        }
+        
+        .code-tooltip.show {
+            display: block;
+        }
+        
+        .copy-button {
+            background: #0071e3;
+            color: white;
+            border: none;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            margin-left: 0.5rem;
+        }
+        
+        /* Session management styles */
+        .session-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            padding: 1rem;
+            background-color: #fafafa;
+        }
+        
+        .session-item {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .session-item:hover {
+            border-color: #0071e3;
+            box-shadow: 0 2px 8px rgba(0,113,227,0.1);
+        }
+        
+        .session-item.selected {
+            border-color: #0071e3;
+            background-color: #f0f8ff;
+        }
+        
+        .session-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .session-id {
+            font-weight: 600;
+            color: #1d1d1f;
+        }
+        
+        .session-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .badge-headless {
+            background-color: #e8e8ed;
+            color: #515154;
+        }
+        
+        .badge-visible {
+            background-color: #d1f4d1;
+            color: #1a7c1a;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #0071e3;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+        
+        .workflow-progress {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .workflow-step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+            color: #6e6e73;
+        }
+        
+        .workflow-step::after {
+            content: '→';
+            position: absolute;
+            right: -20px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.5rem;
+            color: #d2d2d7;
+        }
+        
+        .workflow-step:last-child::after {
+            display: none;
+        }
+        
+        .workflow-step.active {
+            color: #0071e3;
+            font-weight: 600;
+        }
+        
+        .workflow-step.completed {
+            color: #1a7c1a;
+        }
+        
+        .file-upload {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        
+        .file-upload input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Browser Automation Control Panel</h1>
+        
+        <!-- Session Management Section -->
+        <div class="card">
+            <h2>🔧 Session Management</h2>
+            <div id="session-status" class="status info" style="display: none;"></div>
+            
+            <div class="button-group" style="margin-bottom: 1rem;">
+                <button id="refresh-sessions" onclick="refreshSessions()">
+                    <span class="loading-spinner"></span>
+                    🔄 Refresh Sessions
+                </button>
+            </div>
+            
+            <div id="sessions-list-container">
+                <div class="session-list" id="session-list">
+                    <div style="text-align: center; padding: 2rem; color: #6e6e73;">
+                        Loading sessions...
+                    </div>
+                </div>
+            </div>
+            
+            <div style="border-top: 1px solid #d2d2d7; margin: 2rem 0; padding-top: 2rem;">
+                <h3 style="margin-bottom: 1rem;">Create New Session</h3>
+                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                    <label style="margin-bottom: 0;">Run in headless mode:</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="headless-toggle">
+                        <span class="slider"></span>
+                    </label>
+                    <span id="headless-label" style="font-size: 0.875rem; color: #6e6e73;">Visible</span>
+                </div>
+                
+                <button id="start-session" onclick="startSession()">
+                    <span class="loading-spinner"></span>
+                    ➕ Create New Browser Session
+                </button>
+            </div>
+            
+            <div class="current-url" id="current-url-display" style="display: none; margin-top: 1rem;">
+                <strong>Current URL:</strong> <span id="current-url-text">No page loaded</span>
+            </div>
+        </div>
+        
+        <!-- Workflow Progress -->
+        <div class="workflow-progress">
+            <div class="workflow-step" id="step-session">1. Session</div>
+            <div class="workflow-step" id="step-navigate">2. Navigate/Screenshot</div>
+            <div class="workflow-step" id="step-detect">3. Detect Elements</div>
+            <div class="workflow-step" id="step-visualize">4. Visualize/Code</div>
+        </div>
+        
+        <!-- Navigation & Screenshot Combined -->
+        <div class="card" id="action-card" style="display: none;">
+            <div class="loading-message">
+                <div class="spinner"></div>
+                <span id="loading-text">Loading...</span>
+            </div>
+            
+            <h2>🌐 Navigation & Screenshot</h2>
+            
+            <div class="input-group">
+                <label for="url">Navigate to URL (optional):</label>
+                <input type="url" id="url" placeholder="https://example.com">
+            </div>
+            
+            <div class="button-group">
+                <button onclick="navigateToUrl()">
+                    <span class="loading-spinner"></span>
+                    Navigate to URL
+                </button>
+                <button onclick="takeScreenshot()">
+                    <span class="loading-spinner"></span>
+                    📸 Take Screenshot
+                </button>
+                
+                <div class="file-upload">
+                    <button class="secondary">
+                        <span class="loading-spinner"></span>
+                        📤 Upload Screenshot
+                    </button>
+                    <input type="file" accept="image/*" onchange="handleFileUpload(event)">
+                </div>
+            </div>
+            
+            <div class="image-container" id="screenshot-container">
+                <span style="color: #6e6e73;">No screenshot captured yet</span>
+            </div>
+        </div>
+        
+        <!-- Bounding Box Detection -->
+        <div class="card" id="detection-card" style="display: none;">
+            <div class="loading-message">
+                <div class="spinner"></div>
+                <span id="detection-loading-text">Detecting elements...</span>
+            </div>
+            
+            <h2>🔍 Element Detection with Gemini Vision</h2>
+            
+            <div class="input-group">
+                <label for="api-key">Gemini API Key:</label>
+                <input type="text" id="api-key" placeholder="AIzaSy..." value="AIzaSyDltBed5hYSZMfL2fsRcD2mXrwsiPaU7oA">
+            </div>
+            
+            <button onclick="detectBoundingBoxes()">
+                <span class="loading-spinner"></span>
+                Detect Elements
+            </button>
+            
+            <div id="bbox-results" style="display: none; margin-top: 1rem;">
+                <h3>Detected Elements</h3>
+                <div class="bbox-list" id="bbox-list"></div>
+            </div>
+        </div>
+        
+        <!-- Visualization & Code Generation -->
+        <div class="card" id="visualization-card" style="display: none;">
+            <h2>🎨 Visualization & Code Generation</h2>
+            
+            <div class="button-group">
+                <button onclick="visualize('bbox')">
+                    <span class="loading-spinner"></span>
+                    Visualize Bounding Boxes
+                </button>
+                <button onclick="visualize('crosshair')">
+                    <span class="loading-spinner"></span>
+                    Visualize Crosshairs
+                </button>
+                <button onclick="resetWorkflow()" class="secondary">Start Over</button>
+            </div>
+            
+            <div class="image-container" id="visualization-container">
+                <span style="color: #6e6e73;">No visualization created yet</span>
+            </div>
+        </div>
+        
+        <!-- Command Execution Area -->
+        <div class="card" id="command-card" style="display: none;">
+            <h2>⌨️ Playwright Command Execution</h2>
+            
+            <div style="background: #1a1a1a; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.875rem;">
+                <strong style="color: #0a84ff;">ℹ️ Command Format:</strong>
+                <ul style="margin: 0.5rem 0 0 1.5rem; padding: 0; color: #cccccc;">
+                    <li>The server automatically handles <code>await</code> - you can include it or omit it</li>
+                    <li>Supported commands: click, type, fill, goto, screenshot, press, select_option, etc.</li>
+                    <li>Examples: <code>page.click({position: {x: 100, y: 200}})</code> or <code>page.type('Hello')</code></li>
+                </ul>
+            </div>
+            
+            <div class="command-area">
+                <textarea id="command-input" class="command-textarea" placeholder="// Enter Playwright commands here...
+page.click({position: {x: 100, y: 200}});
+page.type('Hello world');
+page.fill('#username', 'john@example.com');
+page.press('Enter');
+page.goto('https://example.com');
+page.screenshot();"></textarea>
+                
+                <div class="command-controls">
+                    <div>
+                        <button onclick="executeCommand()">
+                            <span class="loading-spinner"></span>
+                            ▶️ Execute
+                        </button>
+                        <button onclick="clearCommand()" class="secondary">Clear</button>
+                    </div>
+                </div>
+                
+                <div id="command-result" class="command-result" style="display: none;"></div>
+                
+                <div class="command-history" id="command-history" style="display: none;">
+                    <h4 style="color: #cccccc; margin-bottom: 0.5rem;">Recent Commands</h4>
+                    <div id="history-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Code tooltip -->
+    <div id="code-tooltip" class="code-tooltip"></div>
+    
+    <script>
+        // Global state
+        let currentSession = null;
+        let currentPage = null;
+        let currentScreenshot = null;
+        let detectedBoundingBoxes = null;
+        let activeSessions = [];
+        let commandHistory = [];
+        let currentUrl = null;
+        let screenshotDimensions = { width: null, height: null };
+        
+        // Update workflow progress
+        function updateWorkflowStep(step) {
+            const steps = ['session', 'navigate', 'detect', 'visualize'];
+            const currentIndex = steps.indexOf(step);
+            
+            steps.forEach((s, index) => {
+                const element = document.getElementById(`step-${s}`);
+                if (index < currentIndex) {
+                    element.classList.add('completed');
+                    element.classList.remove('active');
+                } else if (index === currentIndex) {
+                    element.classList.add('active');
+                    element.classList.remove('completed');
+                } else {
+                    element.classList.remove('active', 'completed');
+                }
+            });
+        }
+        
+        // Show status message
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('session-status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            
+            if (type !== 'error') {
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        // Toggle loading state for button
+        function setButtonLoading(button, loading, text) {
+            if (loading) {
+                button.disabled = true;
+                button.classList.add('loading');
+                if (text) {
+                    const textNode = Array.from(button.childNodes).find(node => node.nodeType === 3);
+                    if (textNode) {
+                        button.setAttribute('data-original-text', textNode.textContent);
+                        textNode.textContent = text;
+                    }
+                }
+            } else {
+                button.disabled = false;
+                button.classList.remove('loading');
+                const originalText = button.getAttribute('data-original-text');
+                if (originalText) {
+                    const textNode = Array.from(button.childNodes).find(node => node.nodeType === 3);
+                    if (textNode) {
+                        textNode.textContent = originalText;
+                    }
+                    button.removeAttribute('data-original-text');
+                }
+            }
+        }
+        
+        // Toggle loading state for card
+        function setCardLoading(cardId, loading, message) {
+            const card = document.getElementById(cardId);
+            const loadingText = card.querySelector('#loading-text') || card.querySelector('#detection-loading-text');
+            
+            if (loading) {
+                card.classList.add('loading');
+                if (loadingText && message) {
+                    loadingText.textContent = message;
+                }
+            } else {
+                card.classList.remove('loading');
+            }
+        }
+        
+        // Update current URL display
+        async function updateCurrentUrl() {
+            if (!currentSession || !currentPage) {
+                document.getElementById('current-url-display').style.display = 'none';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/sessions/${currentSession}/pages/${currentPage}/url`);
+                if (response.ok) {
+                    const data = await response.json();
+                    currentUrl = data.url;
+                    document.getElementById('current-url-text').textContent = currentUrl || 'No page loaded';
+                    document.getElementById('current-url-display').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Failed to get current URL:', error);
+            }
+        }
+        
+        // Toggle headless mode
+        document.getElementById('headless-toggle').addEventListener('change', function() {
+            const label = document.getElementById('headless-label');
+            label.textContent = this.checked ? 'Headless' : 'Visible';
+        });
+        
+        // Refresh sessions list
+        async function refreshSessions() {
+            const button = document.getElementById('refresh-sessions');
+            setButtonLoading(button, true, 'Refreshing...');
+            
+            try {
+                const response = await fetch('/sessions');
+                const data = await response.json();
+                
+                activeSessions = data.sessions;
+                renderSessionsList();
+                
+                if (data.count === 0) {
+                    showStatus('No active sessions', 'info');
+                } else {
+                    showStatus(`Found ${data.count} active session(s)`, 'success');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                setButtonLoading(button, false);
+            }
+        }
+        
+        // Render sessions list
+        function renderSessionsList() {
+            const container = document.getElementById('session-list');
+            
+            if (activeSessions.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #6e6e73;">No active sessions. Create a new session to get started.</div>';
+                return;
+            }
+            
+            container.innerHTML = activeSessions.map(session => `
+                <div class="session-item ${session.session_id === currentSession ? 'selected' : ''}" 
+                     onclick="selectSession('${session.session_id}')">
+                    <div class="session-header">
+                        <span class="session-id">Session: ${session.session_id.substring(0, 8)}...</span>
+                        <span class="session-badge ${session.headless ? 'badge-headless' : 'badge-visible'}">
+                            ${session.headless ? '👁️‍🗨️ Headless' : '👁️ Visible'}
+                        </span>
+                    </div>
+                    <div style="font-size: 0.875rem; color: #6e6e73;">
+                        Pages: ${session.pages.length}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Select a session
+        async function selectSession(sessionId) {
+            const session = activeSessions.find(s => s.session_id === sessionId);
+            if (!session) return;
+            
+            currentSession = sessionId;
+            
+            // If session has pages, select the first one
+            if (session.pages.length > 0) {
+                currentPage = session.pages[0].page_id;
+            } else {
+                // Create a page
+                try {
+                    const response = await fetch(`/sessions/${sessionId}/pages`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        currentPage = data.page_id;
+                    }
+                } catch (error) {
+                    showStatus('Failed to create page', 'error');
+                }
+            }
+            
+            await updateCurrentUrl();
+            updateSessionDisplay();
+            renderSessionsList();
+        }
+        
+        // Update session display
+        function updateSessionDisplay() {
+            if (currentSession) {
+                document.getElementById('action-card').style.display = 'block';
+                document.getElementById('command-card').style.display = 'block';
+                updateWorkflowStep('navigate');
+            }
+        }
+        
+        // Start a new browser session
+        async function startSession() {
+            const button = document.getElementById('start-session');
+            setButtonLoading(button, true, 'Creating session...');
+            
+            const headless = document.getElementById('headless-toggle').checked;
+            
+            try {
+                const response = await fetch('/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ browser_type: 'chromium', headless: headless })
+                });
+                
+                if (!response.ok) throw new Error('Failed to create session');
+                
+                const data = await response.json();
+                currentSession = data.session_id;
+                
+                // Create a page in the session
+                const pageResponse = await fetch(`/sessions/${currentSession}/pages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!pageResponse.ok) throw new Error('Failed to create page');
+                
+                const pageData = await pageResponse.json();
+                currentPage = pageData.page_id;
+                
+                // Update UI
+                await updateCurrentUrl();
+                updateSessionDisplay();
+                showStatus(`Browser session started successfully! (${headless ? 'headless' : 'visible'})`, 'success');
+                
+                // Refresh sessions list
+                await refreshSessions();
+                
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                setButtonLoading(button, false);
+            }
+        }
+        
+        // Navigate to URL
+        async function navigateToUrl() {
+            if (!currentSession || !currentPage) {
+                showStatus('Please start a session first', 'error');
+                return;
+            }
+            
+            const url = document.getElementById('url').value;
+            if (!url) {
+                showStatus('Please enter a URL', 'error');
+                return;
+            }
+            
+            const button = event.target;
+            setButtonLoading(button, true, 'Navigating...');
+            setCardLoading('action-card', true, 'Navigating to URL...');
+            
+            try {
+                const response = await fetch('/navigate_to', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: currentSession,
+                        page_id: currentPage,
+                        url: url
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Failed to navigate');
+                
+                const data = await response.json();
+                showStatus(`Navigated to: ${data.title}`, 'success');
+                
+                await updateCurrentUrl();
+                document.getElementById('url').value = '';
+                
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                setButtonLoading(button, false);
+                setCardLoading('action-card', false);
+            }
+        }
+        
+        // Take screenshot
+        async function takeScreenshot() {
+            if (!currentSession || !currentPage) {
+                showStatus('Please start a session first', 'error');
+                return;
+            }
+            
+            const button = event.target;
+            setButtonLoading(button, true, 'Taking screenshot...');
+            setCardLoading('action-card', true, 'Capturing screenshot...');
+            
+            try {
+                const response = await fetch(`/get_screenshot/${currentSession}/${currentPage}`);
+                if (!response.ok) throw new Error('Failed to take screenshot');
+                
+                const data = await response.json();
+                currentScreenshot = `data:image/png;base64,${data.screenshot}`;
+                
+                // Display screenshot
+                const container = document.getElementById('screenshot-container');
+                const img = new Image();
+                img.onload = function() {
+                    screenshotDimensions.width = this.naturalWidth;
+                    screenshotDimensions.height = this.naturalHeight;
+                    console.log('Screenshot dimensions:', screenshotDimensions);
+                };
+                img.src = currentScreenshot;
+                container.innerHTML = '';
+                container.appendChild(img);
+                
+                showStatus('Screenshot captured successfully!', 'success');
+                document.getElementById('detection-card').style.display = 'block';
+                updateWorkflowStep('detect');
+                
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                setButtonLoading(button, false);
+                setCardLoading('action-card', false);
+            }
+        }
+        
+        // Handle file upload
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentScreenshot = e.target.result;
+                
+                // Display screenshot
+                const container = document.getElementById('screenshot-container');
+                const img = new Image();
+                img.onload = function() {
+                    screenshotDimensions.width = this.naturalWidth;
+                    screenshotDimensions.height = this.naturalHeight;
+                    console.log('Screenshot dimensions:', screenshotDimensions);
+                };
+                img.src = currentScreenshot;
+                container.innerHTML = '';
+                container.appendChild(img);
+                
+                showStatus('Screenshot uploaded successfully!', 'success');
+                document.getElementById('detection-card').style.display = 'block';
+                updateWorkflowStep('detect');
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Generate Playwright code for click
+        function generateClickCode(coords) {
+            const [ymin, xmin, ymax, xmax] = coords;
+            
+            // Check if dimensions are available
+            if (!screenshotDimensions.width || !screenshotDimensions.height) {
+                console.error('Screenshot dimensions not available');
+                // Fallback to raw coordinates
+                const x = Math.round((xmin + xmax) / 2);
+                const y = Math.round((ymin + ymax) / 2);
+                return `page.click({position: {x: ${x}, y: ${y}}});`;
+            }
+            
+            // Normalize coordinates (divide by 1000) and multiply by actual dimensions
+            const normalizedYmin = ymin / 1000;
+            const normalizedXmin = xmin / 1000;
+            const normalizedYmax = ymax / 1000;
+            const normalizedXmax = xmax / 1000;
+            
+            // Convert to pixel coordinates using screenshot dimensions
+            const pixelXmin = Math.round(normalizedXmin * screenshotDimensions.width);
+            const pixelXmax = Math.round(normalizedXmax * screenshotDimensions.width);
+            const pixelYmin = Math.round(normalizedYmin * screenshotDimensions.height);
+            const pixelYmax = Math.round(normalizedYmax * screenshotDimensions.height);
+            
+            // Calculate center point
+            const x = Math.round((pixelXmin + pixelXmax) / 2);
+            const y = Math.round((pixelYmin + pixelYmax) / 2);
+            
+            return `page.click({position: {x: ${x}, y: ${y}}});`;
+        }
+        
+        // Generate Playwright code for type
+        function generateTypeCode(coords, text) {
+            const [ymin, xmin, ymax, xmax] = coords;
+            
+            // Check if dimensions are available
+            if (!screenshotDimensions.width || !screenshotDimensions.height) {
+                console.error('Screenshot dimensions not available');
+                // Fallback to raw coordinates
+                const x = Math.round((xmin + xmax) / 2);
+                const y = Math.round((ymin + ymax) / 2);
+                return `page.click({position: {x: ${x}, y: ${y}}});\npage.type('${text}');`;
+            }
+            
+            // Normalize coordinates (divide by 1000) and multiply by actual dimensions
+            const normalizedYmin = ymin / 1000;
+            const normalizedXmin = xmin / 1000;
+            const normalizedYmax = ymax / 1000;
+            const normalizedXmax = xmax / 1000;
+            
+            // Convert to pixel coordinates using screenshot dimensions
+            const pixelXmin = Math.round(normalizedXmin * screenshotDimensions.width);
+            const pixelXmax = Math.round(normalizedXmax * screenshotDimensions.width);
+            const pixelYmin = Math.round(normalizedYmin * screenshotDimensions.height);
+            const pixelYmax = Math.round(normalizedYmax * screenshotDimensions.height);
+            
+            // Calculate center point
+            const x = Math.round((pixelXmin + pixelXmax) / 2);
+            const y = Math.round((pixelYmin + pixelYmax) / 2);
+            
+            // First click to focus, then type
+            return `page.click({position: {x: ${x}, y: ${y}}});\npage.type('${text}');`;
+        }
+        
+        // Show code tooltip
+        function showCodeTooltip(code, event) {
+            const tooltip = document.getElementById('code-tooltip');
+            tooltip.innerHTML = `
+                <pre style="margin: 0;">${code}</pre>
+                <button class="copy-button" onclick="copyCode('${code.replace(/'/g, "\\'")}')">Copy</button>
+            `;
+            tooltip.style.left = event.pageX + 10 + 'px';
+            tooltip.style.top = event.pageY + 10 + 'px';
+            tooltip.classList.add('show');
+            
+            // Auto-fill command input
+            document.getElementById('command-input').value = code;
+        }
+        
+        // Hide code tooltip
+        function hideCodeTooltip() {
+            const tooltip = document.getElementById('code-tooltip');
+            tooltip.classList.remove('show');
+        }
+        
+        // Copy code to clipboard
+        function copyCode(code) {
+            navigator.clipboard.writeText(code).then(() => {
+                showStatus('Code copied to clipboard!', 'success');
+            });
+        }
+        
+        // Detect bounding boxes
+        async function detectBoundingBoxes() {
+            if (!currentScreenshot) {
+                showStatus('Please capture or upload a screenshot first', 'error');
+                return;
+            }
+            
+            const apiKey = document.getElementById('api-key').value;
+            if (!apiKey) {
+                showStatus('Please enter your Gemini API key', 'error');
+                return;
+            }
+            
+            const button = event.target;
+            setButtonLoading(button, true, 'Detecting...');
+            setCardLoading('detection-card', true, 'Analyzing image with Gemini Vision...');
+            
+            try {
+                const response = await fetch('/screenshot_to_bounding_boxes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        screenshot: currentScreenshot,
+                        api_key: apiKey,
+                        prompt: 'Return bounding boxes as JSON arrays [ymin, xmin, ymax, xmax] for all icons, svgs, clickable elements, buttons, etc'
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(error);
+                }
+                
+                const data = await response.json();
+                detectedBoundingBoxes = data.coordinates;
+                
+                // Display bounding boxes
+                renderBoundingBoxes();
+                
+                showStatus(`Detected ${data.count} elements!`, 'success');
+                document.getElementById('visualization-card').style.display = 'block';
+                updateWorkflowStep('visualize');
+                
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                setButtonLoading(button, false);
+                setCardLoading('detection-card', false);
+            }
+        }
+        
+        // Render bounding boxes list
+        function renderBoundingBoxes() {
+            const container = document.getElementById('bbox-list');
+            const resultsDiv = document.getElementById('bbox-results');
+            
+            if (!detectedBoundingBoxes || detectedBoundingBoxes.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #6e6e73;">No elements detected</div>';
+                return;
+            }
+            
+            resultsDiv.style.display = 'block';
+            
+            container.innerHTML = detectedBoundingBoxes.map((coords, index) => {
+                const [ymin, xmin, ymax, xmax] = coords;
+                return `
+                    <div class="bbox-item">
+                        <div>
+                            <strong>Element ${index + 1}:</strong>
+                            <span class="bbox-coords">[${ymin}, ${xmin}, ${ymax}, ${xmax}]</span>
+                        </div>
+                        <div class="bbox-actions">
+                            <button onclick="showCodeTooltip('${generateClickCode(coords)}', event)" 
+                                    onmouseleave="hideCodeTooltip()">
+                                📍 Click
+                            </button>
+                            <input type="text" placeholder="Text to type" id="type-text-${index}">
+                            <button onclick="handleTypeAction(${index}, [${coords}])">
+                                ⌨️ Type
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Handle type action
+        function handleTypeAction(index, coords) {
+            const textInput = document.getElementById(`type-text-${index}`);
+            const text = textInput.value;
+            
+            if (!text) {
+                showStatus('Please enter text to type', 'error');
+                return;
+            }
+            
+            const code = generateTypeCode(coords, text);
+            showCodeTooltip(code, event);
+        }
+        
+        // Visualize bounding boxes
+        async function visualize(mode) {
+            if (!currentScreenshot || !detectedBoundingBoxes) {
+                showStatus('Please detect bounding boxes first', 'error');
+                return;
+            }
+            
+            const button = event.target;
+            setButtonLoading(button, true, 'Creating visualization...');
+            
+            try {
+                const response = await fetch('/visualize_bounding_boxes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        screenshot: currentScreenshot,
+                        bounding_boxes: detectedBoundingBoxes,
+                        mode: mode
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Failed to create visualization');
+                
+                const data = await response.json();
+                
+                // Display visualization
+                const container = document.getElementById('visualization-container');
+                container.innerHTML = `<img src="${data.visualized_image}" alt="Visualization">`;
+                
+                showStatus('Visualization created successfully!', 'success');
+                
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                setButtonLoading(button, false);
+            }
+        }
+        
+        // Execute command
+        async function executeCommand() {
+            if (!currentSession || !currentPage) {
+                showStatus('Please start a session first', 'error');
+                return;
+            }
+            
+            const command = document.getElementById('command-input').value;
+            if (!command) {
+                showStatus('Please enter a command', 'error');
+                return;
+            }
+            
+            const button = event.target;
+            setButtonLoading(button, true, 'Executing...');
+            
+            try {
+                const response = await fetch('/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: currentSession,
+                        page_id: currentPage,
+                        command: command
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Display result
+                const resultDiv = document.getElementById('command-result');
+                resultDiv.style.display = 'block';
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+                
+                // Add to history
+                addToCommandHistory(command);
+                
+                if (response.ok) {
+                    showStatus('Command executed successfully!', 'success');
+                } else {
+                    showStatus(`Error: ${data.error}`, 'error');
+                }
+                
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                setButtonLoading(button, false);
+            }
+        }
+        
+        // Add command to history
+        function addToCommandHistory(command) {
+            commandHistory.unshift(command);
+            if (commandHistory.length > 5) {
+                commandHistory = commandHistory.slice(0, 5);
+            }
+            renderCommandHistory();
+        }
+        
+        // Render command history
+        function renderCommandHistory() {
+            const container = document.getElementById('history-list');
+            const historyDiv = document.getElementById('command-history');
+            
+            if (commandHistory.length === 0) {
+                historyDiv.style.display = 'none';
+                return;
+            }
+            
+            historyDiv.style.display = 'block';
+            container.innerHTML = commandHistory.map(cmd => `
+                <div class="history-item" onclick="loadFromHistory('${cmd.replace(/'/g, "\\'")}')">
+                    ${cmd}
+                </div>
+            `).join('');
+        }
+        
+        // Load command from history
+        function loadFromHistory(command) {
+            document.getElementById('command-input').value = command;
+        }
+        
+        // Clear command
+        function clearCommand() {
+            document.getElementById('command-input').value = '';
+            document.getElementById('command-result').style.display = 'none';
+        }
+        
+        // Reset workflow
+        function resetWorkflow() {
+            currentScreenshot = null;
+            detectedBoundingBoxes = null;
+            screenshotDimensions = { width: null, height: null };
+            
+            document.getElementById('screenshot-container').innerHTML = '<span style="color: #6e6e73;">No screenshot captured yet</span>';
+            document.getElementById('visualization-container').innerHTML = '<span style="color: #6e6e73;">No visualization created yet</span>';
+            document.getElementById('bbox-results').style.display = 'none';
+            
+            updateWorkflowStep('navigate');
+            showStatus('Ready to take a new screenshot', 'info');
+        }
+        
+        
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateWorkflowStep('session');
+            refreshSessions();
+        });
+    </script>
+</body>
+</html>

@@ -21,7 +21,7 @@ class EnhancedBrowserClient:
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{self.server_url}/sessions",
-                params={"browser_type": browser_type, "headless": headless}
+                json={"browser_type": browser_type, "headless": headless}
             )
             response.raise_for_status()
             data = response.json()

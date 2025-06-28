@@ -33,20 +33,29 @@ async def main():
     
     print(f"Found {len(result['coordinates'])} elements")
     
+    # Get image dimensions for normalization
+    from PIL import Image
+    img = Image.open(screenshot_path)
+    width, height = img.size
+    
     # Look for X button in top-right
     print("\nAll detected elements:")
     for i, coords in enumerate(result['coordinates']):
         ymin, xmin, ymax, xmax = coords
-        center_x = int((xmin + xmax) / 2)
-        center_y = int((ymin + ymax) / 2)
+        # Normalize coordinates (divide by 1000 and multiply by image dimensions)
+        center_x = int((xmin + xmax) / 2 / 1000 * width)
+        center_y = int((ymin + ymax) / 2 / 1000 * height)
         print(f"Element {i+1}: {coords} - Center: x={center_x}, y={center_y}")
     
     print("\nLooking for X button in top-right area...")
     for i, coords in enumerate(result['coordinates']):
         ymin, xmin, ymax, xmax = coords
-        if xmin > 900 and ymin < 100:  # Broader search area
-            center_x = int((xmin + xmax) / 2)
-            center_y = int((ymin + ymax) / 2)
+        # Normalize coordinates for comparison
+        normalized_xmin = xmin / 1000 * width
+        normalized_ymin = ymin / 1000 * height
+        if normalized_xmin > 900 and normalized_ymin < 100:  # Broader search area
+            center_x = int((xmin + xmax) / 2 / 1000 * width)
+            center_y = int((ymin + ymax) / 2 / 1000 * height)
             print(f"Element {i+1}: {coords} - Center: x={center_x}, y={center_y}")
             
             # Click it

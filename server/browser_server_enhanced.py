@@ -41,8 +41,13 @@ sessions: Dict[str, BrowserContext] = {}
 pages: Dict[str, Page] = {}
 console_logs: Dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))  # Max 1000 logs per page
 network_logs: Dict[str, deque] = defaultdict(lambda: deque(maxlen=500))   # Max 500 network logs per page
+session_metadata: Dict[str, Dict] = {}  # Store metadata about sessions
 
 # Request/Response models
+class CreateSessionRequest(BaseModel):
+    browser_type: str = "chromium"
+    headless: bool = True
+
 class CommandRequest(BaseModel):
     command: str
     args: List[Any] = []
@@ -74,6 +79,11 @@ class NavigateRequest(BaseModel):
     session_id: str
     page_id: str
     url: str
+
+class SimpleCommandRequest(BaseModel):
+    session_id: str
+    page_id: str
+    command: str
 
 class BoundingBoxRequest(BaseModel):
     screenshot: str  # Base64 encoded image or file path
@@ -179,19 +189,19 @@ async def setup_page_listeners(page_id: str, page: Page):
     page.on("requestfailed", on_request_failed)
 
 @app.post("/sessions")
-async def create_session(browser_type: str = "chromium", headless: bool = True):
+async def create_session(request: CreateSessionRequest):
     """Create a new browser session"""
     session_id = str(uuid.uuid4())[:8]
     
     # Launch browser
-    if browser_type == "chromium":
-        browser = await playwright_instance.chromium.launch(headless=headless)
-    elif browser_type == "firefox":
-        browser = await playwright_instance.firefox.launch(headless=headless)
-    elif browser_type == "webkit":
-        browser = await playwright_instance.webkit.launch(headless=headless)
+    if request.browser_type == "chromium":
+        browser = await playwright_instance.chromium.launch(headless=request.headless)
+    elif request.browser_type == "firefox":
+        browser = await playwright_instance.firefox.launch(headless=request.headless)
+    elif request.browser_type == "webkit":
+        browser = await playwright_instance.webkit.launch(headless=request.headless)
     else:
-        raise HTTPException(400, f"Unknown browser type: {browser_type}")
+        raise HTTPException(400, f"Unknown browser type: {request.browser_type}")
     
     # Create context
     context = await browser.new_context()
@@ -199,15 +209,52 @@ async def create_session(browser_type: str = "chromium", headless: bool = True):
     # Store
     browsers[session_id] = browser
     sessions[session_id] = context
+    session_metadata[session_id] = {
+        "created_at": datetime.now().isoformat(),
+        "browser_type": request.browser_type,
+        "headless": request.headless
+    }
     
-    print(f"✓ Created session: {session_id}")
-    return {"session_id": session_id, "status": "created"}
+    print(f"✓ Created session: {session_id} (headless={request.headless})")
+    return {"session_id": session_id, "status": "created", "headless": request.headless}
 
 @app.get("/sessions")
 async def list_sessions():
-    """List all active sessions"""
+    """List all active sessions with detailed information"""
+    detailed_sessions = []
+    
+    for session_id, context in sessions.items():
+        session_info = {
+            "session_id": session_id,
+            "created_at": session_metadata.get(session_id, {}).get("created_at", "Unknown"),
+            "headless": session_metadata.get(session_id, {}).get("headless", True),
+            "browser_type": session_metadata.get(session_id, {}).get("browser_type", "chromium"),
+            "pages": []
+        }
+        
+        # Get pages for this session
+        for page_id, page in pages.items():
+            if page.context == context:
+                try:
+                    page_info = {
+                        "page_id": page_id,
+                        "url": page.url,
+                        "title": await page.title() if not page.is_closed() else "Closed"
+                    }
+                    session_info["pages"].append(page_info)
+                except:
+                    # Page might be closed or inaccessible
+                    page_info = {
+                        "page_id": page_id,
+                        "url": "Unknown",
+                        "title": "Error accessing page"
+                    }
+                    session_info["pages"].append(page_info)
+        
+        detailed_sessions.append(session_info)
+    
     return {
-        "sessions": list(sessions.keys()),
+        "sessions": detailed_sessions,
         "count": len(sessions)
     }
 
@@ -233,6 +280,8 @@ async def close_session(session_id: str):
     
     del sessions[session_id]
     del browsers[session_id]
+    if session_id in session_metadata:
+        del session_metadata[session_id]
     
     return {"status": "closed"}
 
@@ -367,6 +416,17 @@ async def execute_command(page_id: str, request: CommandRequest):
             return {"status": "success", "url": page.url}
         
         elif command == "click":
+            # Check if this is a position-based click
+            if not args and "position" in kwargs:
+                # Extract x, y from position dict
+                position = kwargs["position"]
+                x = position.get("x", position.get("X"))
+                y = position.get("y", position.get("Y"))
+                if x is not None and y is not None:
+                    # Use page.mouse.click for position-based clicks
+                    await page.mouse.click(float(x), float(y))
+                    return {"status": "success", "message": f"Clicked at position ({x}, {y})"}
+            # Regular selector-based click
             await page.click(*args, **kwargs)
             return {"status": "success"}
         
@@ -434,6 +494,161 @@ async def execute_command(page_id: str, request: CommandRequest):
         print(f"✗ Error executing {command}: {e}")
         raise HTTPException(500, f"Command failed: {str(e)}")
 
+@app.post("/command")
+async def execute_simple_command(request: SimpleCommandRequest):
+    """Execute a Playwright command with session and page IDs in the request body"""
+    if request.session_id not in sessions:
+        raise HTTPException(404, f"Session not found: {request.session_id}")
+    if request.page_id not in pages:
+        raise HTTPException(404, f"Page not found: {request.page_id}")
+    
+    page = pages[request.page_id]
+    command = request.command.strip()
+    
+    try:
+        # Parse and execute Playwright commands directly
+        # Remove 'await' prefix if present
+        if command.startswith('await '):
+            command = command[6:]
+        
+        # Handle common Playwright commands
+        if command.startswith('page.click('):
+            # Extract the argument from page.click(...)
+            arg_str = command[11:-1]  # Remove 'page.click(' and ')'
+            
+            # Check if it's a position-based click
+            if '{position:' in arg_str:
+                # Parse position coordinates (supports float values and different formats)
+                import re
+                # More flexible regex to handle decimals and different spacing
+                match = re.search(r'x:\s*([\d.]+).*?y:\s*([\d.]+)', arg_str, re.IGNORECASE)
+                if match:
+                    x = float(match.group(1))
+                    y = float(match.group(2))
+                    # Use page.mouse.click for position-based clicks
+                    await page.mouse.click(x, y)
+                    return {"status": "success", "message": f"Clicked at position ({x}, {y})"}
+            else:
+                # It's a selector-based click
+                selector = arg_str.strip().strip('"\'')
+                await page.click(selector)
+                return {"status": "success", "message": f"Clicked selector: {selector}"}
+        
+        elif command.startswith('page.type('):
+            # Extract arguments - could be just text or selector + text
+            arg_str = command[10:-1]  # Remove 'page.type(' and ')'
+            
+            # Check if there's a comma (indicating selector + text)
+            if ',' in arg_str:
+                parts = arg_str.split(',', 1)
+                selector = parts[0].strip().strip('"\'')
+                text = parts[1].strip().strip('"\'')
+                await page.type(selector, text)
+                return {"status": "success", "message": f"Typed '{text}' into {selector}"}
+            else:
+                # Just text, type into currently focused element
+                text = arg_str.strip().strip('"\'')
+                await page.keyboard.type(text)
+                return {"status": "success", "message": f"Typed: {text}"}
+        
+        elif command.startswith('page.fill('):
+            # Extract selector and value
+            arg_str = command[10:-1]  # Remove 'page.fill(' and ')'
+            parts = arg_str.split(',', 1)
+            if len(parts) == 2:
+                selector = parts[0].strip().strip('"\'')
+                value = parts[1].strip().strip('"\'')
+                await page.fill(selector, value)
+                return {"status": "success", "message": f"Filled {selector} with {value}"}
+        
+        elif command.startswith('page.goto('):
+            # Extract URL
+            arg_str = command[10:-1]  # Remove 'page.goto(' and ')'
+            url = arg_str.strip().strip('"\'')
+            await page.goto(url)
+            return {"status": "success", "message": f"Navigated to {url}", "url": page.url}
+        
+        elif command.startswith('page.screenshot('):
+            # Take screenshot
+            screenshot_data = await page.screenshot()
+            return {
+                "status": "success",
+                "message": "Screenshot taken",
+                "screenshot": base64.b64encode(screenshot_data).decode()
+            }
+        
+        elif command.startswith('page.press('):
+            # Extract key to press
+            arg_str = command[11:-1]  # Remove 'page.press(' and ')'
+            key = arg_str.strip().strip('"\'')
+            await page.press(key)
+            return {"status": "success", "message": f"Pressed key: {key}"}
+        
+        elif command.startswith('page.select_option('):
+            # Extract selector and value
+            arg_str = command[19:-1]  # Remove 'page.select_option(' and ')'
+            parts = arg_str.split(',', 1)
+            if len(parts) == 2:
+                selector = parts[0].strip().strip('"\'')
+                value = parts[1].strip().strip('"\'')
+                await page.select_option(selector, value)
+                return {"status": "success", "message": f"Selected {value} in {selector}"}
+        
+        elif command.startswith('page.wait_for_selector('):
+            # Extract selector
+            arg_str = command[23:-1]  # Remove 'page.wait_for_selector(' and ')'
+            selector = arg_str.strip().strip('"\'')
+            await page.wait_for_selector(selector)
+            return {"status": "success", "message": f"Found selector: {selector}"}
+        
+        elif command.startswith('page.wait_for_timeout('):
+            # Extract timeout
+            arg_str = command[22:-1]  # Remove 'page.wait_for_timeout(' and ')'
+            timeout = int(arg_str.strip())
+            await page.wait_for_timeout(timeout)
+            return {"status": "success", "message": f"Waited {timeout}ms"}
+        
+        elif command.startswith('page.mouse.click('):
+            # Direct mouse click command
+            arg_str = command[17:-1]  # Remove 'page.mouse.click(' and ')'
+            parts = arg_str.split(',')
+            if len(parts) >= 2:
+                x = float(parts[0].strip())
+                y = float(parts[1].strip())
+                await page.mouse.click(x, y)
+                return {"status": "success", "message": f"Mouse clicked at position ({x}, {y})"}
+        
+        elif command == 'page.reload()':
+            await page.reload()
+            return {"status": "success", "message": "Page reloaded"}
+        
+        elif command == 'page.go_back()':
+            await page.go_back()
+            return {"status": "success", "message": "Navigated back"}
+        
+        elif command == 'page.go_forward()':
+            await page.go_forward()
+            return {"status": "success", "message": "Navigated forward"}
+        
+        else:
+            # Fallback: try to evaluate as JavaScript (for backward compatibility)
+            # Wrap in async function to support await
+            wrapped_command = f"(async () => {{ return {command} }})()"
+            result = await page.evaluate(wrapped_command)
+            return {
+                "status": "success",
+                "result": result,
+                "message": "Executed as JavaScript"
+            }
+    
+    except Exception as e:
+        import traceback
+        return {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
 @app.get("/")
 async def root():
     """Health check endpoint"""
@@ -484,6 +699,23 @@ async def navigate_to(request: NavigateRequest):
         }
     except Exception as e:
         raise HTTPException(500, f"Failed to navigate: {str(e)}")
+
+@app.get("/sessions/{session_id}/pages/{page_id}/url")
+async def get_page_url(session_id: str, page_id: str):
+    """Get the current URL of a page"""
+    if session_id not in sessions:
+        raise HTTPException(404, f"Session not found: {session_id}")
+    if page_id not in pages:
+        raise HTTPException(404, f"Page not found: {page_id}")
+    
+    try:
+        page = pages[page_id]
+        return {
+            "url": page.url,
+            "title": await page.title() if page.url else None
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Failed to get URL: {str(e)}")
 
 @app.post("/screenshot_to_bounding_boxes")
 async def screenshot_to_bounding_boxes(request: BoundingBoxRequest):
@@ -591,6 +823,14 @@ async def ui():
     ui_file = static_dir / "index.html"
     if not ui_file.exists():
         raise HTTPException(404, "UI not found. Please create /static/index.html")
+    return FileResponse(str(ui_file))
+
+@app.get("/ui-enhanced")
+async def ui_enhanced():
+    """Serve the enhanced UI"""
+    ui_file = static_dir / "index_enhanced.html"
+    if not ui_file.exists():
+        raise HTTPException(404, "Enhanced UI not found. Please create /static/index_enhanced.html")
     return FileResponse(str(ui_file))
 
 if __name__ == "__main__":

@@ -253,3 +253,22 @@ class CrosshairBrowserClient(EnhancedBrowserClient):
     def enable_crosshairs(self):
         """Enable crosshair screenshots"""
         self.crosshair_screenshots = True
+    
+    async def execute_command(self, session_id: str, page_id: str, command: str) -> Dict[str, Any]:
+        """
+        Execute a Playwright command via the /command endpoint
+        
+        Args:
+            session_id: The browser session ID
+            page_id: The page ID
+            command: The Playwright command to execute (e.g., "page.click({position: {x: 100, y: 200}})")
+            
+        Returns:
+            Dict with command execution result
+        """
+        response = await self.post('/command', {
+            'session_id': session_id,
+            'page_id': page_id,
+            'command': command
+        })
+        return response

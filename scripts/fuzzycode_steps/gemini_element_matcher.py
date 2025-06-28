@@ -65,8 +65,15 @@ Just return the number (e.g., "7") or "NO_MATCH". Nothing else.
         if 0 <= box_number < len(all_elements['coordinates']):
             coords = all_elements['coordinates'][box_number]
             ymin, xmin, ymax, xmax = coords
-            center_x = int((xmin + xmax) / 2)
-            center_y = int((ymin + ymax) / 2)
+            
+            # Get image dimensions for proper coordinate normalization
+            from PIL import Image
+            img = Image.open(screenshot_path)
+            width, height = img.size
+            
+            # Normalize coordinates (divide by 1000 and multiply by image dimensions)
+            center_x = int(((xmin + xmax) / 2) / 1000 * width)
+            center_y = int(((ymin + ymax) / 2) / 1000 * height)
             
             print(f"✓ Gemini identified box {box_number + 1} at ({center_x}, {center_y})")
             return {

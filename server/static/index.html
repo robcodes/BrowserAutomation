@@ -103,6 +103,7 @@
             display: flex;
             gap: 1rem;
             margin-top: 1rem;
+            flex-wrap: wrap;
         }
         
         .status {
@@ -262,28 +263,204 @@
         .workflow-step.completed {
             color: #1a7c1a;
         }
+        
+        /* New styles for session management */
+        .session-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            padding: 1rem;
+            background-color: #fafafa;
+        }
+        
+        .session-item {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .session-item:hover {
+            border-color: #0071e3;
+            box-shadow: 0 2px 8px rgba(0,113,227,0.1);
+        }
+        
+        .session-item.selected {
+            border-color: #0071e3;
+            background-color: #f0f8ff;
+        }
+        
+        .session-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .session-id {
+            font-weight: 600;
+            color: #1d1d1f;
+        }
+        
+        .session-meta {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.875rem;
+            color: #6e6e73;
+        }
+        
+        .session-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .badge-headless {
+            background-color: #e8e8ed;
+            color: #515154;
+        }
+        
+        .badge-visible {
+            background-color: #d1f4d1;
+            color: #1a7c1a;
+        }
+        
+        .page-list {
+            margin-top: 0.5rem;
+            padding-left: 1rem;
+        }
+        
+        .page-item {
+            padding: 0.25rem 0;
+            font-size: 0.875rem;
+            color: #515154;
+            cursor: pointer;
+        }
+        
+        .page-item:hover {
+            color: #0071e3;
+        }
+        
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #0071e3;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: #6e6e73;
+        }
+        
+        .section-divider {
+            border-top: 1px solid #d2d2d7;
+            margin: 2rem 0;
+            position: relative;
+        }
+        
+        .section-divider span {
+            position: absolute;
+            top: -0.75rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 0 1rem;
+            color: #6e6e73;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Browser Automation Control Panel</h1>
         
-        <div class="workflow-progress">
-            <div class="workflow-step" id="step-session">1. Start Session</div>
-            <div class="workflow-step" id="step-navigate">2. Navigate</div>
-            <div class="workflow-step" id="step-screenshot">3. Screenshot</div>
-            <div class="workflow-step" id="step-detect">4. Detect Elements</div>
-            <div class="workflow-step" id="step-visualize">5. Visualize</div>
-        </div>
-        
-        <!-- Session Management -->
+        <!-- Session Management Section -->
         <div class="card">
-            <h2>Session Management</h2>
+            <h2>🔧 Session Management</h2>
             <div id="session-status" class="status info" style="display: none;"></div>
             
+            <div class="section-divider" style="margin-top: 0;">
+                <span>Active Sessions</span>
+            </div>
+            
+            <div class="button-group" style="margin-bottom: 1rem;">
+                <button id="refresh-sessions" onclick="refreshSessions()">🔄 Refresh Sessions</button>
+            </div>
+            
+            <div id="sessions-list-container">
+                <div class="session-list" id="session-list">
+                    <div class="empty-state">No active sessions. Create a new session to get started.</div>
+                </div>
+            </div>
+            
+            <div class="section-divider">
+                <span>Create New Session</span>
+            </div>
+            
+            <div class="toggle-group">
+                <label for="headless-toggle" style="margin-bottom: 0;">Run in headless mode:</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="headless-toggle">
+                    <span class="slider"></span>
+                </label>
+                <span id="headless-label" style="font-size: 0.875rem; color: #6e6e73;">Visible (for debugging)</span>
+            </div>
+            
             <div class="button-group">
-                <button id="start-session" onclick="startSession()">Start New Browser Session</button>
-                <button id="list-sessions" onclick="listSessions()" class="secondary">List Active Sessions</button>
+                <button id="start-session" onclick="startSession()">➕ Create New Browser Session</button>
             </div>
             
             <div class="input-group" style="margin-top: 1rem; display: none;" id="session-info">
@@ -294,9 +471,18 @@
             </div>
         </div>
         
+        <!-- Workflow Progress -->
+        <div class="workflow-progress">
+            <div class="workflow-step" id="step-session">1. Select/Create Session</div>
+            <div class="workflow-step" id="step-navigate">2. Navigate</div>
+            <div class="workflow-step" id="step-screenshot">3. Screenshot</div>
+            <div class="workflow-step" id="step-detect">4. Detect Elements</div>
+            <div class="workflow-step" id="step-visualize">5. Visualize</div>
+        </div>
+        
         <!-- Navigation -->
         <div class="card" id="navigation-card" style="display: none;">
-            <h2>Navigation</h2>
+            <h2>🌐 Navigation</h2>
             <div class="input-group">
                 <label for="url">URL to Navigate:</label>
                 <input type="url" id="url" placeholder="https://example.com" value="https://fuzzycode.dev">
@@ -306,7 +492,7 @@
         
         <!-- Screenshot -->
         <div class="card" id="screenshot-card" style="display: none;">
-            <h2>Screenshot Capture</h2>
+            <h2>📸 Screenshot Capture</h2>
             <button onclick="takeScreenshot()">Take Screenshot</button>
             
             <div class="file-upload">
@@ -321,7 +507,7 @@
         
         <!-- Bounding Box Detection -->
         <div class="card" id="detection-card" style="display: none;">
-            <h2>Element Detection with Gemini Vision</h2>
+            <h2>🔍 Element Detection with Gemini Vision</h2>
             
             <div class="input-group">
                 <label for="api-key">Gemini API Key:</label>
@@ -347,7 +533,7 @@
         
         <!-- Visualization -->
         <div class="card" id="visualization-card" style="display: none;">
-            <h2>Visualization</h2>
+            <h2>🎨 Visualization</h2>
             
             <div class="button-group">
                 <button onclick="visualize('bbox')">Visualize as Bounding Boxes</button>
@@ -367,6 +553,7 @@
         let currentPage = null;
         let currentScreenshot = null;
         let detectedBoundingBoxes = null;
+        let activeSessions = [];
         
         // Update workflow progress
         function updateWorkflowStep(step) {
@@ -404,17 +591,144 @@
             }
         }
         
+        // Format timestamp
+        function formatTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diff = now - date;
+            
+            if (diff < 60000) {
+                return 'Just now';
+            } else if (diff < 3600000) {
+                return `${Math.floor(diff / 60000)} min ago`;
+            } else if (diff < 86400000) {
+                return `${Math.floor(diff / 3600000)} hours ago`;
+            } else {
+                return date.toLocaleDateString();
+            }
+        }
+        
+        // Refresh sessions list
+        async function refreshSessions() {
+            try {
+                const response = await fetch('/sessions');
+                const data = await response.json();
+                
+                activeSessions = data.sessions;
+                renderSessionsList();
+                
+                if (data.count === 0) {
+                    showStatus('No active sessions', 'info');
+                } else {
+                    showStatus(`Found ${data.count} active session(s)`, 'success');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Render sessions list
+        function renderSessionsList() {
+            const container = document.getElementById('session-list');
+            
+            if (activeSessions.length === 0) {
+                container.innerHTML = '<div class="empty-state">No active sessions. Create a new session to get started.</div>';
+                return;
+            }
+            
+            container.innerHTML = activeSessions.map(session => `
+                <div class="session-item ${session.session_id === currentSession ? 'selected' : ''}" 
+                     onclick="selectSession('${session.session_id}')">
+                    <div class="session-header">
+                        <span class="session-id">Session: ${session.session_id}</span>
+                        <span class="session-badge ${session.headless ? 'badge-headless' : 'badge-visible'}">
+                            ${session.headless ? '👁️‍🗨️ Headless' : '👁️ Visible'}
+                        </span>
+                    </div>
+                    <div class="session-meta">
+                        <span>Created: ${formatTimestamp(session.created_at)}</span>
+                        <span>Browser: ${session.browser_type}</span>
+                        <span>Pages: ${session.pages.length}</span>
+                    </div>
+                    ${session.pages.length > 0 ? `
+                        <div class="page-list">
+                            ${session.pages.map(page => `
+                                <div class="page-item" onclick="selectPage(event, '${session.session_id}', '${page.page_id}')">
+                                    📄 ${page.page_id}: ${page.title || page.url}
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+        
+        // Select a session
+        function selectSession(sessionId) {
+            const session = activeSessions.find(s => s.session_id === sessionId);
+            if (!session) return;
+            
+            currentSession = sessionId;
+            
+            // If session has pages, select the first one
+            if (session.pages.length > 0) {
+                currentPage = session.pages[0].page_id;
+            } else {
+                currentPage = null;
+            }
+            
+            updateSessionDisplay();
+            renderSessionsList();
+        }
+        
+        // Select a page
+        function selectPage(event, sessionId, pageId) {
+            event.stopPropagation();
+            currentSession = sessionId;
+            currentPage = pageId;
+            updateSessionDisplay();
+            renderSessionsList();
+        }
+        
+        // Update session display
+        function updateSessionDisplay() {
+            if (currentSession) {
+                document.getElementById('session-id').value = currentSession;
+                document.getElementById('page-id').value = currentPage || '';
+                document.getElementById('session-info').style.display = 'block';
+                document.getElementById('navigation-card').style.display = 'block';
+                
+                if (currentPage) {
+                    updateWorkflowStep('navigate');
+                } else {
+                    showStatus('Please create a page in this session', 'info');
+                }
+            }
+        }
+        
+        // Toggle headless mode
+        document.getElementById('headless-toggle').addEventListener('change', function() {
+            const label = document.getElementById('headless-label');
+            if (this.checked) {
+                label.textContent = 'Headless (no UI)';
+            } else {
+                label.textContent = 'Visible (for debugging)';
+            }
+        });
+        
         // Start a new browser session
         async function startSession() {
             const button = document.getElementById('start-session');
             button.disabled = true;
             button.innerHTML = '<span class="loading"></span> Starting...';
             
+            const headless = document.getElementById('headless-toggle').checked;
+            
             try {
                 const response = await fetch('/sessions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ browser_type: 'chromium', headless: false })
+                    body: JSON.stringify({ browser_type: 'chromium', headless: headless })
                 });
                 
                 if (!response.ok) throw new Error('Failed to create session');
@@ -434,35 +748,17 @@
                 currentPage = pageData.page_id;
                 
                 // Update UI
-                document.getElementById('session-id').value = currentSession;
-                document.getElementById('page-id').value = currentPage;
-                document.getElementById('session-info').style.display = 'block';
-                document.getElementById('navigation-card').style.display = 'block';
+                updateSessionDisplay();
+                showStatus(`Browser session started successfully! (${headless ? 'headless' : 'visible'})`, 'success');
                 
-                showStatus('Browser session started successfully!', 'success');
-                updateWorkflowStep('navigate');
+                // Refresh sessions list
+                await refreshSessions();
                 
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
             } finally {
                 button.disabled = false;
-                button.innerHTML = 'Start New Browser Session';
-            }
-        }
-        
-        // List active sessions
-        async function listSessions() {
-            try {
-                const response = await fetch('/sessions');
-                const data = await response.json();
-                
-                if (data.count === 0) {
-                    showStatus('No active sessions', 'info');
-                } else {
-                    showStatus(`Active sessions: ${data.sessions.join(', ')}`, 'info');
-                }
-            } catch (error) {
-                showStatus(`Error: ${error.message}`, 'error');
+                button.innerHTML = '➕ Create New Browser Session';
             }
         }
         
@@ -664,6 +960,7 @@
         // Initialize on load
         document.addEventListener('DOMContentLoaded', function() {
             updateWorkflowStep('session');
+            refreshSessions();
         });
     </script>
 </body>
