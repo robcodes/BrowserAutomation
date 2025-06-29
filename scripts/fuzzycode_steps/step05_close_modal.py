@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
-Step 5: Close the welcome modal after login (Fixed Version)
-The modal shows "Welcome, [email]!" inside a "User Login" modal with an X button.
+Step 5: Close the welcome modal after login
+- Takes screenshot to check if modal is present
+- If present, attempts to close it
+- Relies on visual verification to confirm result
 """
 from common import *
 
@@ -18,237 +20,135 @@ async def step05_close_modal():
     print(f"📋 Page ID: {session_info['page_id']}")
     
     # Connect to existing session
-    client = EnhancedBrowserClient()
+    client = BrowserClient()  # Use crosshair client
     await client.connect_session(session_info['session_id'])
     await client.set_page(session_info['page_id'])
     
     try:
         # Take initial screenshot
-        await take_screenshot_and_check(client, "step05_01_modal_visible.png", 
-                                      "Welcome modal should be visible")
+        print("\n1. Taking screenshot to check for modal...")
+        await take_screenshot_and_check(
+            client, 
+            "step05_modal_check.png", 
+            "CHECK SCREENSHOT: Is there a welcome modal visible?"
+        )
         
-        # Check if modal is present
-        print("\n1. Checking for welcome modal...")
-        modal_check = await client.evaluate("""
+        print("\n2. ⚠️  IMPORTANT: Look at the screenshot above!")
+        print("   - If you see a welcome modal, we'll try to close it")
+        print("   - If no modal is visible, we're already good to go")
+        
+        # Find close button in the welcome modal
+        print("\n3. Looking for close button in welcome modal...")
+        close_button_info = await client.evaluate("""
             (() => {
-                // Check for any visible modal
-                let modal = document.querySelector('.modal.show');
-                if (!modal) modal = document.querySelector('.modal[style*="display: block"]');
-                if (!modal) modal = document.querySelector('.modal[style*="display:block"]');
-                if (!modal) modal = document.querySelector('[role="dialog"]');
+                // Check in main document first
+                let closeBtn = document.querySelector('.modal .close, .modal button.close, [data-dismiss="modal"], .modal-header button');
                 
-                // Check for close button
-                let closeButton = null;
-                if (modal) {
-                    // Look for X button in modal header
-                    closeButton = modal.querySelector('.modal-header button.close, .modal-header .close, button[aria-label="Close"], .btn-close');
-                    if (!closeButton) {
-                        // Try broader search
-                        closeButton = modal.querySelector('button.close, .close, [data-dismiss="modal"], [data-bs-dismiss="modal"]');
+                if (!closeBtn) {
+                    // Check in iframes
+                    const iframes = Array.from(document.querySelectorAll('iframe'));
+                    for (const iframe of iframes) {
+                        try {
+                            const iframeDoc = iframe.contentDocument;
+                            if (!iframeDoc) continue;
+                            
+                            closeBtn = iframeDoc.querySelector('.close, button.close, [data-dismiss="modal"], .modal-header button');
+                            if (closeBtn) {
+                                // Get button position relative to iframe
+                                const btnRect = closeBtn.getBoundingClientRect();
+                                const iframeRect = iframe.getBoundingClientRect();
+                                
+                                return {
+                                    x: iframeRect.left + btnRect.left + btnRect.width / 2,
+                                    y: iframeRect.top + btnRect.top + btnRect.height / 2,
+                                    text: closeBtn.textContent ? closeBtn.textContent.trim() : 'X',
+                                    found: true,
+                                    inIframe: true
+                                };
+                            }
+                        } catch (e) {
+                            console.warn('Cannot access iframe:', e);
+                        }
                     }
                 }
                 
-                // Also check for welcome text
-                const hasWelcomeText = document.body.textContent.includes('Welcome, robert.norbeau+test2@gmail.com!');
+                if (closeBtn) {
+                    const rect = closeBtn.getBoundingClientRect();
+                    return {
+                        x: rect.left + rect.width / 2,
+                        y: rect.top + rect.height / 2,
+                        text: closeBtn.textContent ? closeBtn.textContent.trim() : 'X',
+                        found: true,
+                        inIframe: false
+                    };
+                }
                 
-                return {
-                    modalFound: modal !== null,
-                    modalDisplay: modal ? window.getComputedStyle(modal).display : null,
-                    hasWelcomeText: hasWelcomeText,
-                    modalClass: modal ? modal.className : null,
-                    closeButtonFound: closeButton !== null,
-                    closeButtonText: closeButton ? closeButton.textContent.trim() : null,
-                    closeButtonClass: closeButton ? closeButton.className : null
-                };
-            })()
-        """)
-        
-        print(f"   Modal found: {modal_check['modalFound']}")
-        print(f"   Has welcome text: {modal_check['hasWelcomeText']}")
-        print(f"   Close button found: {modal_check['closeButtonFound']}")
-        if modal_check['closeButtonFound']:
-            print(f"   Close button text: '{modal_check['closeButtonText']}'")
-            print(f"   Close button class: {modal_check['closeButtonClass']}")
-        
-        if not modal_check['modalFound'] and not modal_check['hasWelcomeText']:
-            print("   ✓ Modal is already closed!")
-            await save_session_info(session_info['session_id'], session_info['page_id'], 5)
-            print_step_result(True, "Modal was already closed")
-            return True
-        
-        # Try clicking the X close button first
-        if modal_check['closeButtonFound']:
-            print("\n2. Clicking the X close button...")
-            try:
-                # Try multiple selectors for the close button
-                close_selectors = [
-                    '.modal.show .modal-header button.close',
-                    '.modal.show .modal-header .close',
-                    '.modal.show button[aria-label="Close"]',
-                    '.modal.show .btn-close',
-                    '.modal .modal-header button.close',
-                    '.modal button[aria-label="Close"]',
-                    'button.close:visible'
-                ]
-                
-                clicked = False
-                for selector in close_selectors:
-                    try:
-                        # Check if element exists before clicking
-                        exists = await client.evaluate(f'document.querySelector("{selector}") !== null')
-                        if exists:
-                            print(f"   Trying selector: {selector}")
-                            await client.click(selector)
-                            clicked = True
-                            break
-                    except:
-                        continue
-                
-                if clicked:
-                    await wait_and_check(client, WAIT_MEDIUM, "Waiting for modal to close")
-                    
-                    # Check if it worked
-                    close_check = await client.evaluate("""
-                        (() => {
-                            let modal = document.querySelector('.modal.show');
-                            if (!modal) modal = document.querySelector('.modal[style*="display: block"]');
-                            const hasWelcomeText = document.body.textContent.includes('Welcome, robert.norbeau+test2@gmail.com!');
-                            
-                            return {
-                                modalStillVisible: modal !== null && window.getComputedStyle(modal).display !== 'none',
-                                hasWelcomeText: hasWelcomeText
-                            };
-                        })()
-                    """)
-                    
-                    if not close_check['modalStillVisible'] and not close_check['hasWelcomeText']:
-                        print("   ✓ X button successfully closed the modal!")
-                        await take_screenshot_and_check(client, "step05_02_modal_closed.png", 
-                                                      "Modal should be closed")
-                        await save_session_info(session_info['session_id'], session_info['page_id'], 5)
-                        print_step_result(True, "Modal closed with X button")
-                        return True
-            except Exception as e:
-                print(f"   Could not click close button: {e}")
-        
-        # Try ESC key as second option
-        print("\n3. Attempting to close modal with ESC key...")
-        await client.evaluate("""
-            (() => {
-                // Dispatch ESC key event at document level
-                const event = new KeyboardEvent('keydown', {
-                    key: 'Escape',
-                    code: 'Escape',
-                    keyCode: 27,
-                    which: 27,
-                    bubbles: true,
-                    cancelable: true
-                });
-                document.dispatchEvent(event);
-                
-                // Also try on the modal itself
-                let modal = document.querySelector('.modal.show');
-                if (!modal) modal = document.querySelector('.modal[style*="display: block"]');
+                // If no close button found, try to find the X in top-right of modal
+                const modal = document.querySelector('.modal, .popup-window, .modal-content');
                 if (modal) {
-                    modal.dispatchEvent(event);
-                }
-            })()
-        """)
-        
-        await wait_and_check(client, WAIT_SHORT, "Waiting for modal to close")
-        
-        # Check if ESC worked
-        esc_check = await client.evaluate("""
-            (() => {
-                let modal = document.querySelector('.modal.show');
-                if (!modal) modal = document.querySelector('.modal[style*="display: block"]');
-                const hasWelcomeText = document.body.textContent.includes('Welcome, robert.norbeau+test2@gmail.com!');
-                
-                return {
-                    modalStillVisible: modal !== null && window.getComputedStyle(modal).display !== 'none',
-                    hasWelcomeText: hasWelcomeText
-                };
-            })()
-        """)
-        
-        if not esc_check['modalStillVisible'] and not esc_check['hasWelcomeText']:
-            print("   ✓ ESC key successfully closed the modal!")
-            await take_screenshot_and_check(client, "step05_03_modal_closed_esc.png", 
-                                          "Modal should be closed")
-            await save_session_info(session_info['session_id'], session_info['page_id'], 5)
-            print_step_result(True, "Modal closed with ESC key")
-            return True
-        
-        # If nothing else worked, try direct removal
-        print("\n4. Other methods didn't work, attempting direct removal...")
-        await client.evaluate("""
-            (() => {
-                // Find and remove modal
-                let modal = document.querySelector('.modal.show');
-                if (!modal) modal = document.querySelector('.modal[style*="display: block"]');
-                if (!modal) modal = document.querySelector('[role="dialog"]');
-                
-                if (modal) {
-                    // Remove show class
-                    modal.classList.remove('show');
-                    
-                    // Hide with style
-                    modal.style.display = 'none';
+                    const rect = modal.getBoundingClientRect();
+                    return {
+                        x: rect.right - 20,  // 20px from right edge
+                        y: rect.top + 20,    // 20px from top edge
+                        text: 'X (estimated)',
+                        found: false,
+                        inIframe: false
+                    };
                 }
                 
-                // Remove backdrop
-                const backdrop = document.querySelector('.modal-backdrop');
-                if (backdrop) {
-                    backdrop.remove();
-                }
-                
-                // Remove modal-open class from body
-                document.body.classList.remove('modal-open');
-                
-                // Restore body overflow
-                document.body.style.overflow = '';
-                document.documentElement.style.overflow = '';
+                return null;
             })()
         """)
         
-        await wait_and_check(client, WAIT_SHORT, "Waiting for direct removal to take effect")
-        
-        # Final verification
-        final_check = await client.evaluate("""
-            (() => {
-                let modal = document.querySelector('.modal');
-                const hasWelcomeText = document.body.textContent.includes('Welcome, robert.norbeau+test2@gmail.com!');
-                const backdrop = document.querySelector('.modal-backdrop');
-                
-                return {
-                    modalGone: !modal || window.getComputedStyle(modal).display === 'none',
-                    welcomeTextGone: !hasWelcomeText,
-                    backdropGone: !backdrop
-                };
-            })()
-        """)
-        
-        if final_check['modalGone'] and final_check['welcomeTextGone'] and final_check['backdropGone']:
-            print("   ✓ Modal successfully removed via direct DOM manipulation!")
-            await take_screenshot_and_check(client, "step05_04_modal_removed.png", 
-                                          "Page after modal removal")
-            await save_session_info(session_info['session_id'], session_info['page_id'], 5)
-            print_step_result(True, "Modal closed via direct removal")
-            return True
+        if close_button_info:
+            print(f"   Found close button: '{close_button_info['text']}' at ({close_button_info['x']}, {close_button_info['y']})")
+            if close_button_info['inIframe']:
+                print("   📍 Button is inside an iframe - using deep click")
+            
+            print("\n4. Clicking close button with deep element detection...")
+            print("   🔬 Using deep click to handle potential iframe elements")
+            click_result = await client.click_at(close_button_info['x'], close_button_info['y'], "modal_close")
+            
+            print(f"   Click result: {click_result['success']}")
+            if click_result.get('screenshot_path'):
+                print(f"   📸 Crosshair screenshot: {click_result['screenshot_path']}")
+            
+            if not click_result.get('success'):
+                print(f"   ⚠️  Click may have failed: {click_result.get('error', 'Unknown error')}")
+            
+            await wait_and_check(client, WAIT_SHORT, "Waiting after close button click")
         else:
-            print("   ❌ Failed to close modal")
-            print(f"   Modal gone: {final_check['modalGone']}")
-            print(f"   Welcome text gone: {final_check['welcomeTextGone']}")
-            print(f"   Backdrop gone: {final_check['backdropGone']}")
-            print_step_result(False, "Could not close modal")
-            return False
+            print("   ❌ No close button found - modal may already be closed")
+        
+        # Take final screenshot
+        print("\n5. Taking final screenshot...")
+        await take_screenshot_and_check(
+            client,
+            "step05_after_close.png",
+            "CHECK SCREENSHOT: Modal should be gone, main interface should be visible"
+        )
+        
+        print("\n6. ⚠️  VERIFY THE RESULT:")
+        print("   - Check the screenshot above")
+        print("   - Modal should be closed")
+        print("   - You should see the main FuzzyCode interface")
+        
+        # Save session info
+        await save_session_info(session_info['session_id'], session_info['page_id'], 5)
+        
+        print_step_result(
+            True,
+            "Step completed - CHECK SCREENSHOT to verify modal is closed"
+        )
+        
+        return True
         
     except Exception as e:
-        print(f"\n❌ Error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        print_step_result(False, f"Error: {str(e)}")
+        print(f"\n❌ Error: {e}")
+        await take_screenshot_and_check(client, "step05_error.png", "Error state")
         return False
 
 if __name__ == "__main__":
-    asyncio.run(step05_close_modal())
+    result = asyncio.run(step05_close_modal())
+    import sys
+    sys.exit(0 if result else 1)

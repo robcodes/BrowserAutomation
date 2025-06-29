@@ -83,7 +83,7 @@ Access the UI at: **http://localhost:8000/ui**
 
 ### Starting the Server
 ```bash
-cd /home/ubuntu/browser_automation
+cd .
 python server/browser_server_enhanced.py
 ```
 

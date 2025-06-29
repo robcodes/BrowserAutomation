@@ -25,7 +25,7 @@ See `/scripts/fuzzycode_steps/` for the reference implementation:
 
 ## 🚨 Critical: Visual Verification
 
-**READ THIS FIRST**: [Visual Verification Guide](docs/VISUAL_VERIFICATION_GUIDE.md)
+**READ THIS FIRST**: [Visual Verification Guide](CLAUDE_INSTRUCTIONS/VISUAL_VERIFICATION_GUIDE.md)
 
 Programmatic checks can lie. Screenshots don't. ALWAYS verify visually!
 
@@ -38,7 +38,7 @@ Programmatic checks can lie. Screenshots don't. ALWAYS verify visually!
 
 2. **Use the client with crosshair visualization** (RECOMMENDED):
    ```python
-   from browser_automation.clients.browser_client_crosshair import CrosshairBrowserClient
+   from clients.browser_client_crosshair import CrosshairBrowserClient
    
    # Crosshairs show EXACTLY where clicks happen
    client = CrosshairBrowserClient()
@@ -56,21 +56,19 @@ Programmatic checks can lie. Screenshots don't. ALWAYS verify visually!
    ```
 
 3. **Debug issues**:
-   - Check `logs/` folder for server logs
    - Use `client.print_recent_errors()` for console errors
    - Screenshots saved in `screenshots/`
 
 ## Project Structure
 
 ```
-browser_automation/
+/
 ├── server/                 # Browser server implementation
-│   ├── browser_server_enhanced.py    # Main server with logging
-│   └── browser_server_poc.py         # Original proof of concept
+│   ├── browser_server_enhanced.py    # Main server with UI
+│   └── static/            # Web UI files
 ├── clients/                # Client libraries
 │   ├── browser_client_crosshair.py   # ⭐ Client with click visualization
 │   ├── browser_client_enhanced.py    # Client with debugging features
-│   ├── browser_client_poc.py         # Original client
 │   └── gemini_detector.py            # Gemini Vision API integration
 ├── scripts/                # Working automation scripts
 │   ├── fuzzycode_steps/   # Modular step-by-step scripts ⭐ REFERENCE
@@ -83,25 +81,19 @@ browser_automation/
 │   │   ├── step06_generate_code.py # Generate code
 │   │   └── run_steps.py   # Runner for all steps
 │   └── gemini_click_helper.py # Helper for visual element detection
-├── experimental/           # FuzzyCode exploration scripts
-├── examples/              # Problem-solving examples
-│   ├── fuzzycode/         # Specific solutions that worked
-│   └── gemini_vision/     # Gemini Vision API examples ⭐ NEW
-│       ├── simple_click_example.py   # Basic usage
-│       ├── modal_close_example.py    # Modal handling
-│       └── README.md      # Gemini setup guide
-├── tests/                 # Test files
-├── docs/                  # Documentation
-├── interim/               # Progress tracking files
+├── CLAUDE_INSTRUCTIONS/    # Essential documentation
+│   ├── VISUAL_VERIFICATION_GUIDE.md
+│   └── STEP_BY_STEP_GUIDE.md
+├── CLAUDE_TMP/            # Temporary work files
+├── experimental/          # Experimental scripts
 └── screenshots/           # Screenshot storage
 
 ## Key Files
 
-- **`server/browser_server_enhanced.py`** - Enhanced server with console/network logging
+- **`server/browser_server_enhanced.py`** - Enhanced server with console/network logging and web UI
+- **`clients/browser_client_crosshair.py`** - Client with click visualization (ALWAYS USE THIS)
 - **`clients/browser_client_enhanced.py`** - Client with debugging capabilities
-- **`ARCHITECTURE.md`** - System design and rationale
-- **`TECHNIQUES.md`** - Automation patterns and solutions
-- **`docs/BROWSER_AUTOMATION_BEST_PRACTICES.md`** - Comprehensive guide
+- **`CLAUDE.md`** - Main instructions for Claude Code
 
 ## Important Discoveries
 
@@ -157,15 +149,13 @@ success = await helper.click_element_by_description(
 ## Troubleshooting
 
 - **Server already running**: Check `ps aux | grep browser_server`
-- **Import errors**: Ensure you're importing from `browser_automation.`
+- **Import errors**: Use direct imports like `from clients.browser_client_crosshair import ...`
 - **Session not found**: Server may have restarted, create new session
 
 ## Further Reading
 
-- See `ARCHITECTURE.md` for system design
-- See `TECHNIQUES.md` for automation patterns
-- See `docs/GEMINI_VISION_GUIDE.md` for visual element detection
-- See `examples/fuzzycode/README.md` for specific solutions
-- See `examples/gemini_vision/` for Gemini Vision examples
-- See `interim/FUZZYCODE_TEST_CREDENTIALS.md` for test login credentials
-- See `docs/` for comprehensive guides
+- See `CLAUDE.md` for main instructions and philosophy
+- See `CLAUDE_INSTRUCTIONS/VISUAL_VERIFICATION_GUIDE.md` for why screenshots matter
+- See `CLAUDE_INSTRUCTIONS/STEP_BY_STEP_GUIDE.md` for the modular approach
+- See `scripts/fuzzycode_steps/README.md` for the reference implementation
+- See `ENV_REPLIT.md` or `ENV_DOCKER_UBUNTU.md` for environment setup

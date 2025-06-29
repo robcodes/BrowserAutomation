@@ -1,0 +1,14 @@
+[
+  {
+    "content": "Fix step05_close_modal.py to use deep element detection",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Check if Gemini JSON and bounding box visualizations are saved",
+    "status": "completed",
+    "priority": "medium",
+    "id": "2"
+  }
+]

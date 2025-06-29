@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Move deep_click_implementation.py to the clients folder",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Update enhanced_crosshair_client.py and move to clients folder",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Update browser_client_crosshair.py to include deep click functionality",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Update step04_submit_login.py to use the enhanced clicking",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Add deep click capability to the server API",
+    "status": "completed",
+    "priority": "high",
+    "id": "5"
+  }
+]

@@ -10,7 +10,10 @@
       "Bash(firefox:*)",
       "Bash(python:*)",
       "Bash(curl:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(diff:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": []
   }

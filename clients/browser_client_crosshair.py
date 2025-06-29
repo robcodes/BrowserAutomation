@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Enhanced Browser Client with built-in crosshair visualization for all clicks
+Enhanced Browser Client with built-in crosshair visualization and deep element detection for all clicks
 """
 import asyncio
 import time
@@ -10,9 +10,10 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent))
 
 from clients.browser_client_enhanced import EnhancedBrowserClient
+from clients.deep_click_mixin import DeepClickMixin
 
-class CrosshairBrowserClient(EnhancedBrowserClient):
-    """Browser client that shows crosshairs for all click operations"""
+class CrosshairBrowserClient(DeepClickMixin, EnhancedBrowserClient):
+    """Browser client that shows crosshairs for all click operations and can detect elements in iframes/shadow DOM"""
     
     def __init__(self, base_url: str = "http://localhost:8000"):
         super().__init__(base_url)
@@ -242,9 +243,25 @@ class CrosshairBrowserClient(EnhancedBrowserClient):
         if not result["success"]:
             raise Exception(f"Click failed: {result.get('error', 'Unknown error')}")
     
-    async def click_at(self, x: float, y: float, label: str = "click_at") -> Dict[str, Any]:
-        """Click at specific coordinates with crosshair"""
-        return await self.click_with_crosshair(x=x, y=y, label=label)
+    async def click_at(self, x: float, y: float, label: str = "click_at", use_deep_click: bool = True) -> Dict[str, Any]:
+        """
+        Click at specific coordinates with crosshair and deep element detection.
+        
+        Args:
+            x: X coordinate to click
+            y: Y coordinate to click  
+            label: Label for the click (used in screenshots)
+            use_deep_click: Whether to use deep element detection (default: True)
+            
+        Returns:
+            Dict with click result including what element was clicked
+        """
+        if use_deep_click:
+            # Use the deep click method from the mixin
+            return await self.click_at_with_deep_detection(x, y, label)
+        else:
+            # Fall back to regular crosshair click
+            return await self.click_with_crosshair(x=x, y=y, label=label)
     
     def disable_crosshairs(self):
         """Disable crosshair screenshots"""

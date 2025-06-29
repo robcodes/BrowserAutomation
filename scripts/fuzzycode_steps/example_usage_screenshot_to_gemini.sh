@@ -5,7 +5,7 @@
 API_KEY="AIzaSyDltBed5hYSZMfL2fsRcD2mXrwsiPaU7oA"
 
 # Path to screenshot
-SCREENSHOT="/home/ubuntu/browser_automation/screenshots/element_search.png"
+SCREENSHOT="./screenshots/element_search.png"
 
 echo "=== Example 1: Basic usage with human-readable output ==="
 ./screenshot_to_gemini_bb_json.py "$SCREENSHOT" --api-key "$API_KEY"

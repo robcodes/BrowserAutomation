@@ -422,10 +422,46 @@ async def execute_command(page_id: str, request: CommandRequest):
                 position = kwargs["position"]
                 x = position.get("x", position.get("X"))
                 y = position.get("y", position.get("Y"))
+                use_deep = kwargs.get("deep", False)  # Option to use deep click
+                
                 if x is not None and y is not None:
-                    # Use page.mouse.click for position-based clicks
+                    if use_deep:
+                        # Use deep element detection for the click
+                        from clients.deep_click_mixin import DeepClickMixin
+                        
+                        # Inject the deep click function
+                        await page.evaluate(DeepClickMixin.DEEP_ELEMENTS_FROM_POINT_JS)
+                        
+                        # Find and click the best element
+                        result = await page.evaluate(f"""
+                            (() => {{
+                                const elements = deepElementsFromPoint({x}, {y});
+                                if (elements.length === 0) return {{success: false, error: 'No elements found'}};
+                                
+                                // Find the best clickable element
+                                let target = elements.find(e => e.isClickable && !e.error);
+                                if (!target) target = elements[0];
+                                
+                                // Click it
+                                try {{
+                                    if (target.element) {{
+                                        target.element.click();
+                                        return {{success: true, element: target.tagName + '#' + target.id}};
+                                    }}
+                                }} catch (e) {{
+                                    // Fall back to mouse click
+                                }}
+                                return {{success: false, fallback: true}};
+                            }})()
+                        """)
+                        
+                        if result.get("success"):
+                            return {"status": "success", "message": f"Deep clicked {result.get('element', 'element')} at ({x}, {y})"}
+                        
+                    # Use page.mouse.click for position-based clicks (or as fallback)
                     await page.mouse.click(float(x), float(y))
                     return {"status": "success", "message": f"Clicked at position ({x}, {y})"}
+                    
             # Regular selector-based click
             await page.click(*args, **kwargs)
             return {"status": "success"}
@@ -817,6 +853,61 @@ static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # Add route for the UI
+@app.post("/pages/{page_id}/deep_elements_at_point")
+async def get_deep_elements_at_point(page_id: str, x: float, y: float):
+    """
+    Get all elements at a specific point, including those inside iframes and shadow DOM.
+    
+    This endpoint injects the deepElementsFromPoint function and returns detailed information
+    about all elements at the specified coordinates.
+    """
+    if page_id not in pages:
+        raise HTTPException(404, f"Page not found: {page_id}")
+    
+    page = pages[page_id]
+    
+    # Import the deep elements detection JavaScript
+    from clients.deep_click_mixin import DeepClickMixin
+    
+    try:
+        # First inject the deepElementsFromPoint function
+        await page.evaluate(DeepClickMixin.DEEP_ELEMENTS_FROM_POINT_JS)
+        
+        # Then call it to get elements
+        elements = await page.evaluate(f"""
+            (() => {{
+                try {{
+                    const elements = deepElementsFromPoint({x}, {y});
+                    return elements.map((info, index) => ({{
+                        index: index,
+                        tagName: info.tagName,
+                        id: info.id,
+                        className: info.className,
+                        text: info.text,
+                        type: info.type,
+                        href: info.href,
+                        isClickable: info.isClickable,
+                        path: info.path,
+                        context: info.context,
+                        error: info.error
+                    }}));
+                }} catch (e) {{
+                    console.error('deepElementsFromPoint error:', e);
+                    return [];
+                }}
+            }})()
+        """)
+        
+        return {
+            "status": "success",
+            "coordinates": {"x": x, "y": y},
+            "elements": elements,
+            "count": len(elements)
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Error detecting elements: {str(e)}")
+
 @app.get("/ui")
 async def ui():
     """Serve the UI"""

@@ -35,7 +35,8 @@ class EnhancedBrowserClient:
             response = await client.get(f"{self.server_url}/sessions")
             response.raise_for_status()
             sessions = response.json()["sessions"]
-            if session_id not in sessions:
+            session_ids = [s["session_id"] for s in sessions]
+            if session_id not in session_ids:
                 raise ValueError(f"Session {session_id} not found")
         
         self.session_id = session_id

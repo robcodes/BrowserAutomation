@@ -1,0 +1,1 @@
+# Temporary Files\n\nThis directory is for work-in-progress files that haven't been finalized yet.\n\nFiles here should be:\n- Moved to proper locations when ready\n- Deleted when no longer needed\n\nDo not commit experimental or draft files directly to the main directories.

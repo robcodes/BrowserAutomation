@@ -10,21 +10,21 @@ export DISPLAY=:99
 pip3 install fastapi uvicorn httpx pydantic > /dev/null 2>&1
 
 # Start server in background
-nohup python3 /home/ubuntu/browser_server_poc.py > /home/ubuntu/browser_server.log 2>&1 &
+nohup python3 ~/browser_server_poc.py > ~/browser_server.log 2>&1 &
 
 # Save PID
-echo $! > /home/ubuntu/browser_server.pid
+echo $! > ~/browser_server.pid
 
 echo "Server starting..."
 sleep 3
 
 # Check if running
-if ps -p $(cat /home/ubuntu/browser_server.pid) > /dev/null; then
+if ps -p $(cat ~/browser_server.pid) > /dev/null; then
     echo "✓ Server is running on http://localhost:8000"
-    echo "✓ PID: $(cat /home/ubuntu/browser_server.pid)"
-    echo "✓ Logs: /home/ubuntu/browser_server.log"
+    echo "✓ PID: $(cat ~/browser_server.pid)"
+    echo "✓ Logs: ~/browser_server.log"
 else
     echo "✗ Server failed to start"
-    echo "Check logs: /home/ubuntu/browser_server.log"
-    tail -20 /home/ubuntu/browser_server.log
+    echo "Check logs: ~/browser_server.log"
+    tail -20 ~/browser_server.log
 fi
