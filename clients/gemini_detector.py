@@ -1,101 +1,269 @@
 #!/usr/bin/env python3
 """
-Gemini Vision API integration for detecting UI elements and their bounding boxes
-in screenshots. This helps locate clickable elements when selectors fail.
+Enhanced Gemini Vision API integration for detecting UI elements and their bounding boxes
+in screenshots. Supports structured output with labels and model-specific prompts.
 """
 import base64
 import json
 import re
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 import asyncio
 import aiohttp
 from PIL import Image, ImageDraw, ImageFont
 import io
+import sys
+
+# Add server directory to path for bbox_visualizer
+sys.path.append(str(Path(__file__).parent.parent / "server"))
+
+
+class BoundingBox:
+    """
+    Represents a bounding box with its 2D coordinates and associated label.
+    """
+    def __init__(self, box_2d: List[int], label: str):
+        self.box_2d = box_2d  # [y_min, x_min, y_max, x_max]
+        self.label = label
+    
+    def to_dict(self):
+        return {"box_2d": self.box_2d, "label": self.label}
+
 
 class GeminiDetector:
+    # Model-specific system prompts
+    SYSTEM_PROMPTS = {
+        "gemini-2.0-flash-exp": """Return bounding boxes for icons, svgs, clickable elements, buttons, etc as an array with labels.
+Never return masks. Limit to 25 objects.
+If an object is present multiple times, give each object a unique label
+according to its distinct characteristics (action, colors, size, position, etc..).
+Exclude anything that is grayed out.""",
+        
+        "gemini-2.5-flash": """Return bounding boxes as an array with labels.
+Never return masks.
+If an object is present multiple times, give each object a unique label
+according to its distinct characteristics (action, colors, size, position, etc..).
+
+IGNORE ANYTHING NOT IN FOCUS"""
+    }
+    
     def __init__(self, api_key: str, model: str = "gemini-2.5-flash"):
         self.api_key = api_key
         self.base_url = "https://generativelanguage.googleapis.com/v1beta/models"
-        self.model = model  # Default to 2.5-flash which works best
+        self.model = model
+        
+    def get_system_prompt(self, model: Optional[str] = None) -> str:
+        """Get the appropriate system prompt for the model"""
+        model_to_use = model or self.model
+        # Default to 2.5 prompt if model not in list
+        return self.SYSTEM_PROMPTS.get(model_to_use, self.SYSTEM_PROMPTS["gemini-2.5-flash"])
         
     async def detect_elements(self, 
                             image_path: str, 
-                            prompt: str = "Return bounding boxes as JSON arrays [ymin, xmin, ymax, xmax] for all clickable elements",
-                            save_annotated: bool = True) -> Dict:
+                            user_prompt: str = "",
+                            system_prompt: Optional[str] = None,
+                            save_annotated: bool = True,
+                            return_labels: bool = True,
+                            num_calls: int = 1) -> Dict:
         """
-        Detect elements in a screenshot using Gemini Vision API
+        Detect elements in a screenshot using Gemini Vision API with enhanced features
         
         Args:
             image_path: Path to the screenshot
-            prompt: What to look for in the image
+            user_prompt: Optional user prompt to add context (e.g. "Find the close button")
+            system_prompt: Override the default system prompt if provided
             save_annotated: Whether to save annotated image with bounding boxes
+            return_labels: Whether to request labels with bounding boxes
+            num_calls: Number of API calls to make (for consistency checking)
             
         Returns:
             Dict containing:
                 - coordinates: List of [ymin, xmin, ymax, xmax] arrays
+                - labels: List of labels (if return_labels=True)
+                - bounding_boxes: List of BoundingBox objects
                 - annotated_image_path: Path to annotated image (if saved)
-                - raw_response: Full API response text
+                - raw_response: Full API response text (or list if num_calls > 1)
+                - results: List of all results if num_calls > 1
         """
+        # Use appropriate system prompt
+        if system_prompt is None:
+            system_prompt = self.get_system_prompt()
+        
+        # Combine system and user prompts
+        full_prompt = system_prompt
+        if user_prompt:
+            full_prompt += f"\n\nAdditional context: {user_prompt}"
+        
         # Read and encode image
         with open(image_path, 'rb') as f:
             image_data = base64.b64encode(f.read()).decode()
         
-        # Prepare API request
-        url = f"{self.base_url}/{self.model}:generateContent?key={self.api_key}"
+        # Make multiple API calls if requested
+        all_results = []
         
-        payload = {
-            "contents": [{
-                "parts": [
-                    {"text": prompt},
-                    {
-                        "inline_data": {
-                            "mime_type": "image/png",
-                            "data": image_data
-                        }
-                    }
-                ]
-            }]
-        }
-        
-        # Make API request with error handling
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload) as response:
-                result = await response.json()
-        
-        # Check for API errors
-        if 'error' in result:
-            error_msg = result['error'].get('message', 'Unknown error')
-            error_code = result['error'].get('code', 'Unknown')
+        for call_num in range(num_calls):
+            # Prepare API request
+            url = f"{self.base_url}/{self.model}:generateContent?key={self.api_key}"
             
-            if error_code == 503 or 'overloaded' in error_msg:
-                raise Exception(f"Gemini API overloaded. Please try again in a moment.")
-            else:
-                raise Exception(f"Gemini API error ({error_code}): {error_msg}")
+            payload = {
+                "contents": [{
+                    "parts": [
+                        {"text": full_prompt},
+                        {
+                            "inline_data": {
+                                "mime_type": "image/png",
+                                "data": image_data
+                            }
+                        }
+                    ]
+                }],
+                "generationConfig": {
+                    "temperature": 0.5,
+                    "candidateCount": 1,
+                }
+            }
+            
+            # Make API request
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload) as response:
+                    result = await response.json()
+            
+            # Check for API errors
+            if 'error' in result:
+                error_msg = result['error'].get('message', 'Unknown error')
+                error_code = result['error'].get('code', 'Unknown')
+                
+                if error_code == 503 or 'overloaded' in error_msg:
+                    raise Exception(f"Gemini API overloaded. Please try again in a moment.")
+                else:
+                    raise Exception(f"Gemini API error ({error_code}): {error_msg}")
+            
+            # Extract response text
+            try:
+                response_text = result['candidates'][0]['content']['parts'][0]['text']
+            except (KeyError, IndexError):
+                raise Exception(f"Unexpected API response structure: {result}")
+            
+            # Parse the response
+            parsed_result = self._parse_response(response_text, return_labels)
+            parsed_result['raw_response'] = response_text
+            parsed_result['call_number'] = call_num + 1
+            
+            all_results.append(parsed_result)
         
-        # Extract response text
-        try:
-            response_text = result['candidates'][0]['content']['parts'][0]['text']
-        except (KeyError, IndexError):
-            raise Exception(f"Unexpected API response structure: {result}")
-        
-        # Extract coordinates
-        coordinates = self._extract_coordinates(response_text)
+        # Consolidate results
+        if num_calls == 1:
+            final_result = all_results[0]
+        else:
+            # Use the first successful result, but include all results
+            final_result = all_results[0]
+            final_result['results'] = all_results
         
         # Create annotated image if requested
-        annotated_path = None
-        if save_annotated and coordinates:
-            annotated_path = self._create_annotated_image(
-                image_path, 
-                coordinates, 
-                response_text
+        if save_annotated and final_result['coordinates']:
+            # Use the enhanced bbox_visualizer
+            from bbox_visualizer import visualize
+            
+            # Prepare data for visualization
+            viz_data = {
+                'coordinates': final_result['coordinates']
+            }
+            if 'labels' in final_result:
+                viz_data['labels'] = final_result['labels']
+            
+            annotated_path = visualize(
+                image_path,
+                json_data=viz_data,
+                mode='bbox',
+                output_path=str(Path(image_path).parent / f"{Path(image_path).stem}_annotated.png")
             )
+            final_result['annotated_image_path'] = annotated_path
         
-        return {
-            'coordinates': coordinates,
-            'annotated_image_path': annotated_path,
-            'raw_response': response_text
+        return final_result
+    
+    def _parse_response(self, response_text: str, return_labels: bool) -> Dict[str, Any]:
+        """Parse the response text to extract bounding boxes and labels"""
+        result = {
+            'coordinates': [],
+            'bounding_boxes': []
         }
+        
+        if return_labels:
+            result['labels'] = []
+        
+        # Try to parse as JSON first (structured output)
+        try:
+            # Clean up markdown code blocks if present
+            cleaned_text = response_text.strip()
+            if cleaned_text.startswith('```json'):
+                cleaned_text = cleaned_text[7:]
+            if cleaned_text.endswith('```'):
+                cleaned_text = cleaned_text[:-3]
+            
+            # Parse JSON
+            parsed_json = json.loads(cleaned_text)
+            
+            # Handle different response formats
+            if isinstance(parsed_json, list):
+                # List of bounding boxes
+                for item in parsed_json:
+                    if isinstance(item, dict):
+                        # Structured format with box_2d and label
+                        if 'box_2d' in item:
+                            coords = item['box_2d']
+                            label = item.get('label', f'Object {len(result["coordinates"]) + 1}')
+                            
+                            result['coordinates'].append(coords)
+                            result['bounding_boxes'].append(BoundingBox(coords, label))
+                            if return_labels:
+                                result['labels'].append(label)
+                    elif isinstance(item, list) and len(item) == 4:
+                        # Simple coordinate array
+                        result['coordinates'].append(item)
+                        label = f'Object {len(result["coordinates"])}'
+                        result['bounding_boxes'].append(BoundingBox(item, label))
+                        if return_labels:
+                            result['labels'].append(label)
+            
+            elif isinstance(parsed_json, dict):
+                # Single bounding box
+                if 'box_2d' in parsed_json:
+                    coords = parsed_json['box_2d']
+                    label = parsed_json.get('label', 'Object 1')
+                    
+                    result['coordinates'].append(coords)
+                    result['bounding_boxes'].append(BoundingBox(coords, label))
+                    if return_labels:
+                        result['labels'].append(label)
+                        
+        except json.JSONDecodeError:
+            # Fall back to regex extraction
+            result['coordinates'] = self._extract_coordinates(response_text)
+            
+            # Create default labels
+            for i, coords in enumerate(result['coordinates']):
+                label = f'Object {i + 1}'
+                result['bounding_boxes'].append(BoundingBox(coords, label))
+                if return_labels:
+                    result['labels'].append(label)
+        
+        return result
+    
+    def _extract_coordinates(self, text: str) -> List[List[int]]:
+        """Extract coordinate arrays from response text using regex"""
+        # Pattern to match [ymin, xmin, ymax, xmax] arrays
+        pattern = r'\[\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\]'
+        matches = re.findall(pattern, text)
+        
+        coordinates = []
+        for match in matches:
+            try:
+                coords = json.loads(match)
+                coordinates.append(coords)
+            except json.JSONDecodeError:
+                continue
+                
+        return coordinates
     
     async def find_element(self, 
                           image_path: str, 
@@ -112,81 +280,14 @@ class GeminiDetector:
         Returns:
             Dict with element coordinates and annotated image
         """
-        prompt = f"""Find the {element_description} in this image and return its bounding box as a JSON array [ymin, xmin, ymax, xmax].
-Also describe what you found and why you think it's the correct element."""
+        user_prompt = f"Find the {element_description} in this image. Focus only on this specific element."
         
-        return await self.detect_elements(image_path, prompt, save_annotated)
-    
-    def _extract_coordinates(self, text: str) -> List[List[int]]:
-        """Extract coordinate arrays from response text"""
-        # Pattern to match [ymin, xmin, ymax, xmax] arrays
-        pattern = r'\[\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\]'
-        matches = re.findall(pattern, text)
-        
-        coordinates = []
-        for match in matches:
-            try:
-                coords = json.loads(match)
-                coordinates.append(coords)
-            except json.JSONDecodeError:
-                continue
-                
-        return coordinates
-    
-    def _create_annotated_image(self, 
-                               image_path: str, 
-                               coordinates: List[List[int]], 
-                               response_text: str) -> str:
-        """Create an annotated version of the image with bounding boxes"""
-        # Open image
-        img = Image.open(image_path)
-        draw = ImageDraw.Draw(img)
-        
-        # Colors for different boxes
-        colors = ['red', 'green', 'blue', 'yellow', 'magenta', 'cyan']
-        
-        # Draw bounding boxes
-        for idx, coords in enumerate(coordinates):
-            ymin, xmin, ymax, xmax = coords
-            
-            # Convert from 1000-scale to actual pixels
-            actual_coords = [
-                xmin * img.width / 1000,
-                ymin * img.height / 1000,
-                xmax * img.width / 1000,
-                ymax * img.height / 1000
-            ]
-            
-            color = colors[idx % len(colors)]
-            
-            # Draw rectangle
-            draw.rectangle(actual_coords, outline=color, width=3)
-            
-            # Draw label
-            label = f"Box {idx + 1}"
-            draw.text((actual_coords[0], actual_coords[1] - 20), label, fill=color)
-        
-        # Save annotated image
-        base_path = Path(image_path)
-        annotated_path = base_path.parent / f"{base_path.stem}_annotated{base_path.suffix}"
-        img.save(annotated_path)
-        
-        # Also save individual bounding box images
-        for idx, coords in enumerate(coordinates):
-            ymin, xmin, ymax, xmax = coords
-            
-            # Convert coordinates
-            x1 = int(xmin * img.width / 1000)
-            y1 = int(ymin * img.height / 1000)
-            x2 = int(xmax * img.width / 1000)
-            y2 = int(ymax * img.height / 1000)
-            
-            # Crop and save
-            cropped = img.crop((x1, y1, x2, y2))
-            crop_path = base_path.parent / f"{base_path.stem}_box{idx + 1}.png"
-            cropped.save(crop_path)
-        
-        return str(annotated_path)
+        return await self.detect_elements(
+            image_path, 
+            user_prompt=user_prompt,
+            save_annotated=save_annotated,
+            return_labels=True
+        )
     
     def convert_to_playwright_coords(self, 
                                    coords: List[int], 
@@ -215,34 +316,76 @@ Also describe what you found and why you think it's the correct element."""
         }
 
 
+# Convenience function for backward compatibility
+async def detect_elements_simple(image_path: str, api_key: str, prompt: str = None) -> Dict:
+    """Simple detection function for backward compatibility"""
+    detector = GeminiDetector(api_key=api_key)
+    
+    if prompt is None:
+        prompt = "Return bounding boxes as JSON arrays [ymin, xmin, ymax, xmax] for all clickable elements"
+    
+    # Use the old simple prompt style
+    result = await detector.detect_elements(
+        image_path,
+        system_prompt=prompt,
+        save_annotated=True,
+        return_labels=False
+    )
+    
+    return {
+        'coordinates': result['coordinates'],
+        'annotated_image_path': result.get('annotated_image_path'),
+        'raw_response': result['raw_response']
+    }
+
+
 # Example usage
 async def example_usage():
-    # API key that works: AIzaSyDltBed5hYSZMfL2fsRcD2mXrwsiPaU7oA
-    # Model to use: gemini-2.5-flash
-    detector = GeminiDetector(api_key="YOUR_API_KEY")
+    # Initialize with API key and model
+    detector = GeminiDetector(
+        api_key="YOUR_API_KEY",
+        model="gemini-2.0-flash-exp"  # or "gemini-2.5-flash"
+    )
     
-    # Detect all clickable elements
+    # Example 1: Detect all clickable elements with default prompts
     result = await detector.detect_elements(
         "screenshot.png",
-        "Find all buttons, links, and clickable elements. Return their bounding boxes as JSON arrays [ymin, xmin, ymax, xmax]"
+        save_annotated=True
     )
     
     print(f"Found {len(result['coordinates'])} elements")
-    print(f"Annotated image saved to: {result['annotated_image_path']}")
+    if 'labels' in result:
+        for i, (coords, label) in enumerate(zip(result['coordinates'], result['labels'])):
+            print(f"  {i+1}. {label}: {coords}")
     
-    # Find specific element
+    # Example 2: Find specific element with user prompt
     close_button = await detector.find_element(
         "screenshot.png",
-        "close button (X button) in the modal header"
+        "X button to close the modal in the top right"
     )
     
-    if close_button['coordinates']:
-        coords = close_button['coordinates'][0]
-        click_pos = detector.convert_to_playwright_coords(coords, 1920, 1080)
-        print(f"Click at: {click_pos}")
+    # Example 3: Custom user prompt for specific elements
+    result = await detector.detect_elements(
+        "screenshot.png",
+        user_prompt="Focus on the login form elements: username field, password field, and sign in button",
+        save_annotated=True
+    )
+    
+    # Example 4: Multiple calls for consistency
+    result = await detector.detect_elements(
+        "screenshot.png",
+        num_calls=3,
+        save_annotated=True
+    )
+    if 'results' in result:
+        print(f"Made {len(result['results'])} API calls")
 
 
 if __name__ == "__main__":
-    # This would need an actual API key to run
-    # asyncio.run(example_usage())
-    print("Gemini Detector module loaded. Use with your API key.")
+    print("Enhanced Gemini Detector module loaded.")
+    print("Features:")
+    print("- Model-specific system prompts (2.0 and 2.5)")
+    print("- Structured output with labels")
+    print("- Custom user prompts for context")
+    print("- Multiple API calls for consistency")
+    print("- Advanced visualization with non-overlapping labels")

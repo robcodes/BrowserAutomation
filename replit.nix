@@ -1,5 +1,7 @@
 { pkgs }: {
   deps = [
+    pkgs.unzip
+    pkgs.zip
     pkgs.firefox
     pkgs.nodejs_20
     pkgs.python312

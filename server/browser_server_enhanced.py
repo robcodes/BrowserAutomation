@@ -88,11 +88,14 @@ class SimpleCommandRequest(BaseModel):
 class BoundingBoxRequest(BaseModel):
     screenshot: str  # Base64 encoded image or file path
     api_key: str
-    prompt: Optional[str] = None
+    prompt: Optional[str] = None  # System prompt (for backward compatibility)
+    user_prompt: Optional[str] = None  # User prompt for additional context
+    model: Optional[str] = None  # Model selection: gemini-2.0-flash-exp, gemini-2.5-flash, etc.
 
 class VisualizeRequest(BaseModel):
     screenshot: str  # Base64 encoded image
     bounding_boxes: List[List[int]]  # Array of [ymin, xmin, ymax, xmax]
+    labels: Optional[List[str]] = None  # Optional labels for each bounding box
     mode: Literal['bbox', 'crosshair'] = 'bbox'
 
 @app.on_event("startup")
@@ -772,18 +775,21 @@ async def screenshot_to_bounding_boxes(request: BoundingBoxRequest):
             f.write(screenshot_data)
         
         try:
-            # Use the imported function
+            # Use the imported function with enhanced parameters
             result = await detect_bounding_boxes(
                 str(temp_path),
                 request.api_key,
                 save_json=False,
-                prompt=request.prompt
+                prompt=request.prompt,
+                model=request.model,
+                user_prompt=request.user_prompt
             )
             
             return {
                 "status": "success",
                 "raw_response": result['raw_response'],
                 "coordinates": result['coordinates'],
+                "labels": result.get('labels', []),
                 "count": len(result['coordinates'])
             }
         finally:
@@ -815,6 +821,8 @@ async def visualize_bounding_boxes(request: VisualizeRequest):
             json_data = {
                 "coordinates": request.bounding_boxes
             }
+            if request.labels:
+                json_data["labels"] = request.labels
             
             # Create visualization
             output_path = visualize(
